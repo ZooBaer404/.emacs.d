@@ -9,9 +9,20 @@
 
 # Built distribution
 dist/
+eln-cache/
+elpa/
+snippets/
+straight/
+auto-save-list/
+eshell
+transient
+.cache
+.dap-breakpoints
 
 # Backup files
 *~
+org-roam.db
 
 # Undo-tree save-files
 *.~undo-tree
+
