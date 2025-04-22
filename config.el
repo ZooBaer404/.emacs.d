@@ -642,13 +642,13 @@
                       (enable-minor-mode
                        '("\\.jsx?\\'" . prettier-js-mode))))
   :custom
-  (web-mode-attr-indent-offset 2)
-  (web-mode-block-padding 2)
-  (web-mode-css-indent-offset 2)
-  (web-mode-code-indent-offset 2)
-  (web-mode-comment-style 2)
+  (web-mode-attr-indent-offset 4)
+  (web-mode-block-padding 4)
+  (web-mode-css-indent-offset 4)
+  (web-mode-code-indent-offset 4)
+  (web-mode-comment-style 4)
   (web-mode-enable-current-element-highlight t)
-  (web-mode-markup-indent-offset 2))
+  (web-mode-markup-indent-offset 4))
 
 (use-package plantuml-mode
   :mode ("\\.\\(plantuml\\|puml\\)\\'")
@@ -715,7 +715,7 @@
 (use-package css-mode
   :ensure flycheck
   :mode "\\.css\\'"
-  :custom (css-indent-offset 2)
+  :custom (css-indent-offset 4)
   :config (flycheck-stylelintrc "~/.stylelintrc.json"))
 
 (use-package typescript-mode
@@ -1894,3 +1894,19 @@
   (org-roam-directory "~/.personal/notes")
   :custom (org-roam-graph-viewer "/usr/bin/qutebrowser")
   :config (org-roam-setup))
+
+(defun my-programming-mode-hook ()
+  (setq tab-width 4)
+  (setq indent-tabs-mode nil)  ; Optional: use spaces instead of tabs
+  (setq c-basic-offset 4)      ; For C-like modes
+  (setq js-indent-level 4)     ; For JavaScript
+  (setq python-indent-offset 4); For Python
+  (setq web-mode-code-indent-offset 4) ; For web-mode
+  (setq web-mode-markup-indent-offset 4) ; For web-mode
+  (setq web-mode-css-indent-offset 4) ; For web-mode
+  )
+
+(add-hook 'c-mode-common-hook 'my-programming-mode-hook)
+(add-hook 'js-mode-hook 'my-programming-mode-hook)
+(add-hook 'python-mode-hook 'my-programming-mode-hook)
+(add-hook 'web-mode-hook 'my-programming-mode-hook)
