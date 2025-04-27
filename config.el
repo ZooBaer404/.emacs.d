@@ -88,6 +88,9 @@
 (set-face-attribute 'default nil :font "CaskaydiaCove NF")
 (set-fontset-font t 'latin "CaskaydiaCove NF")
 
+(use-package vterm
+  :ensure t)
+
 (use-package dap-mode
   :after lsp-mode
   :config
@@ -919,299 +922,6 @@
   (savehist-file (expand-file-name (format "%s/emacs/history" xdg-cache)))
   :config (savehist-mode))
 
-(use-package hydra
-  :bind (("C-c I" . hydra-image/body)
-         ("C-c L" . hydra-ledger/body)
-         ("C-c M" . hydra-merge/body)
-         ("C-c T" . hydra-tool/body)
-         ("C-c b" . hydra-btoggle/body)
-         ("C-c c" . hydra-clock/body)
-         ("C-c e" . hydra-circe/body)
-         ("C-c f" . hydra-flycheck/body)
-         ("C-c g" . hydra-go-to-file/body)
-         ("C-c m" . hydra-magit/body)
-         ("C-c o" . hydra-org/body)
-         ("C-c p" . hydra-projectile/body)
-         ("C-c s" . hydra-spelling/body)
-         ("C-c t" . hydra-tex/body)
-         ("C-c u" . hydra-upload/body)
-         ("C-c w" . hydra-windows/body)))
-
-(use-package major-mode-hydra
-  :after hydra
-  :preface
-  (defun with-alltheicon (icon str &optional height v-adjust face)
-    "Display an icon from all-the-icon."
-    (s-concat (all-the-icons-alltheicon icon :v-adjust (or v-adjust 0) :height (or height 1) :face face) " " str))
-
-  (defun with-faicon (icon str &optional height v-adjust face)
-    "Display an icon from Font Awesome icon."
-    (s-concat (all-the-icons-faicon icon ':v-adjust (or v-adjust 0) :height (or height 1) :face face) " " str))
-
-  (defun with-fileicon (icon str &optional height v-adjust face)
-    "Display an icon from the Atom File Icons package."
-    (s-concat (all-the-icons-fileicon icon :v-adjust (or v-adjust 0) :height (or height 1) :face face) " " str))
-
-  (defun with-octicon (icon str &optional height v-adjust face)
-    "Display an icon from the GitHub Octicons."
-    (s-concat (all-the-icons-octicon icon :v-adjust (or v-adjust 0) :height (or height 1) :face face) " " str)))
-
-(pretty-hydra-define hydra-btoggle
-  (:hint nil :color amaranth :quit-key "q" :title (with-faicon "toggle-on" "Toggle" 1 -0.05))
-  ("Basic"
-   (("a" abbrev-mode "abbrev" :toggle t)
-    ("h" global-hungry-delete-mode "hungry delete" :toggle t))
-   "Coding"
-   (("e" electric-operator-mode "electric operator" :toggle t)
-    ("F" flyspell-mode "flyspell" :toggle t)
-    ("f" flycheck-mode "flycheck" :toggle t)
-    ("l" lsp-mode "lsp" :toggle t)
-    ("s" smartparens-mode "smartparens" :toggle t))
-   "UI"
-   (("i" ivy-rich-mode "ivy-rich" :toggle t))))
-
-(pretty-hydra-define hydra-circe
-  (:hint nil :color teal :quit-key "q" :title (with-faicon "comments-o" "Circe" 1 -0.05))
-  ("Action"
-   (("c" circe "connect")
-    ("r" circe-reconnect "reconnect")
-    ("u" my/circe-count-nicks "user"))))
-
-(pretty-hydra-define hydra-clock
-  (:hint nil :color teal :quit-key "q" :title (with-faicon "clock-o" "Clock" 1 -0.05))
-  ("Action"
-   (("c" org-clock-cancel "cancel")
-    ("d" org-clock-display "display")
-    ("e" org-clock-modify-effort-estimate "effort")
-    ("i" org-clock-in "in")
-    ("j" org-clock-goto "jump")
-    ("o" org-clock-out "out")
-    ("p" org-pomodoro "pomodoro")
-    ("r" org-clock-report "report"))))
-
-(pretty-hydra-define hydra-flycheck
-  (:hint nil :color teal :quit-key "q" :title (with-faicon "plane" "Flycheck" 1 -0.05))
-  ("Checker"
-   (("?" flycheck-describe-checker "describe")
-    ("d" flycheck-disable-checker "disable")
-    ("m" flycheck-mode "mode")
-    ("s" flycheck-select-checker "select"))
-   "Errors"
-   (("<" flycheck-previous-error "previous" :color pink)
-    (">" flycheck-next-error "next" :color pink)
-    ("f" flycheck-buffer "check")
-    ("l" flycheck-list-errors "list"))
-   "Other"
-   (("M" flycheck-manual "manual")
-    ("v" flycheck-verify-setup "verify setup"))))
-
-(pretty-hydra-define hydra-go-to-file
-  (:hint nil :color teal :quit-key "q" :title (with-octicon "file-symlink-file" "Go To" 1 -0.05))
-  ("Agenda"
-   (("ac" (find-file "~/.personal/agenda/contacts.org") "contacts")
-    ("ah" (find-file "~/.personal/agenda/home.org") "home")
-    ("ai" (find-file "~/.personal/agenda/inbox.org") "inbox")
-    ("ag" (find-file "~/.personal/agenda/goals.org") "goals")
-    ("ap" (find-file "~/.personal/agenda/people.org") "people")
-    ("ar" (find-file "~/.personal/agenda/routine.org") "routine")
-    ("aR" (find-file "~/.personal/agenda/review.org") "review")
-    ("as" (find-file "~/.personal/agenda/someday.org") "someday")
-    ("aw" (find-file "~/.personal/agenda/work.org") "work"))
-   "Config"
-   (("ca" (find-file (format "%s/sh/aliases" xdg-config)) "aliases")
-    ("ce" (find-file "~/.emacs.d/config.org") "emacs")
-    ("cE" (find-file (format "%s/sh/environ" xdg-config)) "environ")
-    ("cf" (find-file (format "%s/foot/foot.ini" xdg-config)) "foot")
-    ("cn" (find-file (format "%s/neofetch/config.conf" xdg-config)) "neofetch")
-    ("cq" (find-file (format "%s/qutebrowser/config.py" xdg-config)) "qutebrowser")
-    ("cr" (find-file (format "%s/ranger/rc.conf" xdg-config)) "ranger")
-    ("cs" (find-file (format "%s/sway/config" xdg-config)) "sway")
-    ("ct" (find-file (format "%s/tmux/tmux.conf" xdg-config)) "tmux")
-    ("cw" (find-file (format "%s/waybar/config" xdg-config)) "waybar")
-    ("cx" (find-file (format "%s/sh/xdg" xdg-config)) "xdg"))
-   "Item"
-   (("ib" (find-file "~/.personal/items/books.org") "book")
-    ("il" (find-file "~/.personal/items/learning.org") "learning")
-    ("im" (find-file "~/.personal/items/movies.org") "movies")
-    ("ip" (find-file "~/.personal/items/purchases.org") "purchases"))
-   "Notes"
-   (("na" (find-file (format "~/.personal/notes/affirmations.pdf" xdg-config)) "affirmations"))
-   "Other"
-   (("ol" (find-file "~/.personal/other/long-goals.org") "long-terms goals")
-    ("os" (find-file "~/.personal/other/short-goals.org") "short-terms goals")
-    ("ou" (find-file "~/.personal/other/usb.org") "usb"))))
-
-(pretty-hydra-define hydra-image
-  (:hint nil :color pink :quit-key "q" :title (with-faicon "file-image-o" "Images" 1 -0.05))
-  ("Action"
-   (("r" image-rotate "rotate")
-    ("s" image-save "save" :color teal))
-    "Zoom"
-    (("-" image-decrease-size "out")
-     ("+" image-increase-size "in")
-     ("=" image-transform-reset "reset"))))
-
-(pretty-hydra-define hydra-ledger
-  (:hint nil :color teal :quit-key "q" :title (with-faicon "usd" "Ledger" 1 -0.05))
-  ("Action"
-   (("b" leadger-add-transaction "add")
-    ("c" ledger-mode-clean-buffer "clear")
-    ("i" ledger-copy-transaction-at-point "copy")
-    ("s" ledger-delete-current-transaction "delete")
-    ("r" ledger-report "report"))))
-
-(pretty-hydra-define hydra-magit
-  (:hint nil :color teal :quit-key "q" :title (with-octicon "mark-github" "Magit" 1 -0.05))
-  ("Action"
-   (("b" magit-blame "blame")
-    ("c" magit-clone "clone")
-    ("i" magit-init "init")
-    ("l" magit-log-buffer-file "commit log (current file)")
-    ("L" magit-log-current "commit log (project)")
-    ("s" magit-status "status"))))
-
-(pretty-hydra-define hydra-merge
-  (:hint nil :color pink :quit-key "q" :title (with-octicon "mark-github" "Magit" 1 -0.05))
-  ("Move"
-   (("n" smerge-next "next")
-    ("p" smerge-prev "previous"))
-   "Keep"
-   (("RET" smerge-keep-current "current")
-    ("a" smerge-keep-all "all")
-    ("b" smerge-keep-base "base")
-    ("l" smerge-keep-lower "lower")
-    ("u" smerge-keep-upper "upper"))
-   "Diff"
-   (("<" smerge-diff-base-upper "upper/base")
-    ("=" smerge-diff-upper-lower "upper/lower")
-    (">" smerge-diff-base-lower "base/lower")
-    ("R" smerge-refine "redefine")
-    ("E" smerge-ediff "ediff"))
-   "Other"
-   (("C" smerge-combine-with-next "combine")
-    ("r" smerge-resolve "resolve")
-    ("k" smerge-kill-current "kill current"))))
-
-(pretty-hydra-define hydra-org
-  (:hint nil :color teal :quit-key "q" :title (with-fileicon "org" "Org" 1 -0.05))
-  ("Action"
-   (("A" my/org-archive-done-tasks "archive")
-    ("a" org-agenda "agenda")
-    ("c" org-capture "capture")
-    ("d" org-decrypt-entry "decrypt")
-    ("i" org-insert-link-global "insert-link")
-    ("j" org-capture-goto-last-stored "jump-capture")
-    ("k" org-cut-subtree "cut-subtree")
-    ("o" org-open-at-point-global "open-link")
-    ("r" org-refile "refile")
-    ("s" org-store-link "store-link")
-    ("t" org-show-todo-tree "todo-tree"))))
-
-(pretty-hydra-define hydra-projectile
-  (:hint nil :color teal :quit-key "q" :title (with-faicon "rocket" "Projectile" 1 -0.05))
-  ("Buffers"
-   (("b" projectile-switch-to-buffer "list")
-    ("k" projectile-kill-buffers "kill all")
-    ("S" projectile-save-project-buffers "save all"))
-   "Find"
-   (("d" projectile-find-dir "directory")
-    ("D" projectile-dired "root")
-    ("f" projectile-find-file "file")
-    ("p" consult-projectile "project"))
-   "Other"
-   (("i" projectile-invalidate-cache "reset cache"))
-   "Search"
-   (("r" projectile-replace "replace")
-    ("R" projectile-replace-regexp "regexp replace")
-    ("s" consult-git-grep "search"))))
-
-(pretty-hydra-define hydra-notes
-  (:hint nil :color teal :quit-key "q" :title (with-octicon "pencil" "Notes" 1 -0.05))
-  ("Notes"
-   (("c" org-roam-dailies-capture-today "capture")
-    ("C" org-roam-dailies-capture-tomorrow "capture tomorrow")
-    ("g" org-roam-graph "graph")
-    ("f" org-roam-node-find "find")
-    ("i" org-roam-node-insert "insert"))
-   "Go To"
-   ((">" org-roam-dailies-goto-next-note "next note")
-    ("<" org-roam-dailies-goto-previous-note "previous note")
-    ("d" org-roam-dailies-goto-date "date")
-    ("t" org-roam-dailies-goto-today "today")
-    ("T" org-roam-dailies-goto-tomorrow "tomorrow")
-    ("y" org-roam-dailies-goto-yesterday "yesterday"))))
-
-(pretty-hydra-define hydra-spelling
-  (:hint nil :color teal :quit-key "q" :title (with-faicon "magic" "Spelling" 1 -0.05))
-  ("Checker"
-   (("c" langtool-correct-buffer "correction")
-    ("C" langtool-check-done "clear")
-    ("d" ispell-change-dictionary "dictionary")
-    ("l" (message "Current language: %s (%s)" langtool-default-language ispell-current-dictionary) "language")
-    ("s" my/switch-language "switch")
-    ("w" wiki-summary "wiki"))
-   "Errors"
-   (("<" flyspell-correct-previous "previous" :color pink)
-    (">" flyspell-correct-next "next" :color pink)
-    ("f" langtool-check "find"))))
-
-(pretty-hydra-define hydra-tex
-  (:hint nil :color teal :quit-key "q" :title (with-fileicon "tex" "LaTeX" 1 -0.05))
-  ("Action"
-   (("g" reftex-goto-label "goto")
-    ("r" reftex-query-replace-document "replace")
-    ("s" counsel-rg "search")
-    ("t" reftex-toc "table of content"))))
-
-(pretty-hydra-define hydra-tool
-  (:hint nil :color teal :quit-key "q" :title (with-faicon "briefcase" "Tool" 1 -0.05))
-  ("Network"
-   (("c" ipcalc "subnet calculator")
-    ("i" ipinfo "ip info"))))
-
-(defhydra hydra-typescript (:color blue)
-  "
-  ^
-  ^TypeScript^          ^Do^
-  ^──────────^──────────^──^───────────
-  _q_ quit             _b_ back
-  ^^                   _e_ errors
-  ^^                   _j_ jump
-  ^^                   _r_ references
-  ^^                   _R_ restart
-  ^^                   ^^
-  "
-  ("q" nil)
-  ("b" tide-jump-back)
-  ("e" tide-project-errors)
-  ("j" tide-jump-to-definition)
-  ("r" tide-references)
-  ("R" tide-restart-server))
-
-(pretty-hydra-define hydra-upload
-  (:hint nil :color teal :quit-key "q" :title (with-faicon "cloud-upload" "Upload" 1 -0.05))
-  ("Action"
-   (("b" webpaste-paste-buffer "buffer")
-    ("i" imgbb-upload "image")
-    ("r" webpaste-paste-region "region"))))
-
-(pretty-hydra-define hydra-windows
-  (:hint nil :forein-keys warn :quit-key "q" :title (with-faicon "windows" "Windows" 1 -0.05))
-  ("Window"
-   (("b" balance-windows "balance")
-    ("c" centered-window-mode "center")
-    ("i" enlarge-window "heighten")
-    ("j" shrink-window-horizontally "narrow")
-    ("k" shrink-window "lower")
-    ("u" winner-undo "undo")
-    ("r" winner-redo "redo")
-    ("l" enlarge-window-horizontally "widen")
-    ("s" switch-window-then-swap-buffer "swap" :color teal))
-   "Zoom"
-   (("-" text-scale-decrease "out")
-    ("+" text-scale-increase "in")
-    ("=" (text-scale-increase 0) "reset"))))
-
 (use-package all-the-icons
   :if (display-graphic-p)
   :commands all-the-icons-install-fonts
@@ -1522,9 +1232,9 @@
     "Returns function that ignores its arguments and invokes FNC."
     `(lambda (&rest _rest)
        (funcall ,fnc)))
-  :hook ((after-save . my/config-tangle)
-         (auto-save . org-save-all-org-buffers)
-         (org-mode . visual-line-mode))
+  ;;  :hook ((after-save . my/config-tangle)
+  ;;         (auto-save . org-save-all-org-buffers)
+  ;;        (org-mode . visual-line-mode))
   :custom
   (org-archive-location "~/.personal/archives/%s::")
   (org-blank-before-new-entry '((heading . t)
@@ -1537,7 +1247,7 @@
   (org-log-done 'time)
   (org-log-into-drawer t)
   (org-modules '(org-crypt
-                 org-habit
+                 ;;org-habit
                  org-mouse
                  org-protocol
                  org-tempo))
@@ -1640,11 +1350,11 @@
   :custom
   (org-agenda-category-icon-alist
    `(
-     ;; ("home" ,(list (all-the-icons-faicon "home" :v-adjust -0.05)) nil nil :ascent center :mask heuristic)
-     ;; ("inbox" ,(list (all-the-icons-faicon "inbox" :v-adjust -0.1)) nil nil :ascent center :mask heuristic)
-     ;; ("people" ,(list (all-the-icons-faicon "people" :v-adjust -0.25)) nil nil :ascent center :mask heuristic)
-     ;; ("work" ,(list (all-the-icons-faicon "work" :v-adjust -0.25)) nil nil :ascent center :mask heuristic)
-     ;; ("routine" ,(list (all-the-icons-faicon "repeat" :v-adjust -0.25)) nil nil :ascent center :mask heuristic)
+     ("home" , "" nil nil :ascent center :mask heuristic)
+     ("inbox" , "" nil nil :ascent center :mask heuristic)
+     ("people" , "" nil nil :ascent center :mask heuristic)
+     ("work" , "" nil nil :ascent center :mask heuristic)
+     ("routine" , "" nil nil :ascent center :mask heuristic)
      ))
   (org-agenda-custom-commands
    '(("d" "Dashboard"
@@ -1904,9 +1614,11 @@
   (setq web-mode-code-indent-offset 4) ; For web-mode
   (setq web-mode-markup-indent-offset 4) ; For web-mode
   (setq web-mode-css-indent-offset 4) ; For web-mode
+  (setq lsp-mode-indent-offset 4)
   )
 
 (add-hook 'c-mode-common-hook 'my-programming-mode-hook)
 (add-hook 'js-mode-hook 'my-programming-mode-hook)
 (add-hook 'python-mode-hook 'my-programming-mode-hook)
 (add-hook 'web-mode-hook 'my-programming-mode-hook)
+(add-hook 'lsp-mode-hook 'my-programming-mode-hook)
