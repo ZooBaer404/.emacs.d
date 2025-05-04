@@ -91,11 +91,18 @@
 (use-package vterm
   :ensure t)
 
-(use-package dap-mode
-  :after lsp-mode
-  :config
-  (dap-mode t)
-  (dap-ui-mode t))
+
+;; (use-package dap-mode
+;;   :after lsp-mode
+;;   :config
+;;   (dap-mode t)
+;;   (dap-ui-mode t))
+
+
+;; (setq lsp-completion-provider :none)
+;; (setq lsp-enable-snippet 'f)
+;; (setq lsp-completion-enable 'f)
+
 
 (use-package doom-themes
   :config
@@ -398,11 +405,6 @@
     (let* ((current-dictionary ispell-current-dictionary)
            (new-dictionary (if (string= current-dictionary "en_US") "fr_BE" "en_US")))
       (ispell-change-dictionary new-dictionary)
-      (if (string= new-dictionary "fr_BE")
-          (progn
-            (setq lsp-ltex-language "fr"))
-        (progn
-          (setq lsp-ltex-language "en-US")))
       (flyspell-buffer)
       (message "[✓] Dictionary switched to %s" new-dictionary)))
   :custom
@@ -456,7 +458,6 @@
           (lambda () (subword-mode 1)))
 
 (use-package cmake-mode
-  :hook (cmake-mode . lsp-deferred)
   :mode ("CMakeLists\\.txt\\'" "\\.cmake\\'"))
 
 (use-package cmake-font-lock
@@ -527,8 +528,7 @@
 (use-package js2-refactor
   :hook (js2-mode . js2-refactor-mode)
   :bind (:map js2-mode-map
-              ("C-k" . js2r-kill)
-              ("M-." . lsp-find-definition)))
+              ("C-k" . js2r-kill)))
 
 (use-package yarn-mode :mode "yarn\\.lock\\'")
 
@@ -590,9 +590,7 @@
   :preface
   (defun my/bibtex-fill-column ()
     "Ensure that each entry does not exceed 120 characters."
-    (setq fill-column 120))
-  :hook ((bibtex-mode . lsp-deferred)
-         (bibtex-mode . my/bibtex-fill-column)))
+    (setq fill-column 120)))
 
 (use-package lua-mode :delight "Λ" :mode "\\.lua\\'")
 
@@ -723,31 +721,26 @@
 
 (use-package typescript-mode
   :ensure flycheck
-  :hook ((typescript-mode . prettier-js-mode)
-         (typescript-mode . lsp-deferred))
+  :hook ((typescript-mode . prettier-js-mode))
   :mode ("\\.\\(ts\\|tsx\\)\\'")
   :custom
   ;; TSLint is depreciated in favor of ESLint.
   (flycheck-disable-checker 'typescript-tslint)
-  (lsp-clients-typescript-server-args '("--stdio" "--tsserver-log-file" "/dev/stderr"))
   (typescript-indent-level 2)
   :config
   (flycheck-add-mode 'javascript-eslint 'typescript-mode))
 
 (use-package vue-mode
   :delight "V"
-  :hook (vue-mode . lsp-deferred)
   :mode "\\.vue\\'"
   :custom (vue-html-extra-indent 2))
 
 (use-package nxml-mode
   :ensure nil
-  :hook (nxml-mode . lsp-deferred)
   :mode ("\\.\\(xml\\|xsd\\|wsdl\\)\\'"))
 
 (use-package yaml-mode
   :delight "ψ"
-  :hook (yaml-mode . lsp-deferred)
   :mode ("\\.\\(yaml\\|yml\\)\\'"))
 
 ;; common lisp
@@ -765,6 +758,13 @@
 (use-package nameless)
 (use-package elsa)
 (use-package flycheck-package)
+
+
+(defun maybe-clang-format ()
+  (when (locate-dominating-file default-directory ".clang-format")
+    (clang-format-buffer)))
+
+(add-hook 'before-save-hook 'maybe-clang-format)
 
 
 (use-package paredit)
@@ -987,7 +987,6 @@
 
 (use-package flycheck
   :delight
-  :hook (lsp-mode . flycheck-mode)
   :bind (:map flycheck-mode-map
               ("M-'" . flycheck-previous-error)
               ("M-\\" . flycheck-next-error))
@@ -1614,11 +1613,30 @@
   (setq web-mode-code-indent-offset 4) ; For web-mode
   (setq web-mode-markup-indent-offset 4) ; For web-mode
   (setq web-mode-css-indent-offset 4) ; For web-mode
-  (setq lsp-mode-indent-offset 4)
+  ;; (setq lsp-mode-indent-offset 4)
   )
 
 (add-hook 'c-mode-common-hook 'my-programming-mode-hook)
 (add-hook 'js-mode-hook 'my-programming-mode-hook)
 (add-hook 'python-mode-hook 'my-programming-mode-hook)
 (add-hook 'web-mode-hook 'my-programming-mode-hook)
-(add-hook 'lsp-mode-hook 'my-programming-mode-hook)
+;; (add-hook 'lsp-mode-hook 'my-programming-mode-hook)
+
+(setq c-doc-comment-style '((c-mode . doxygen)
+                            (c++-mode . doxygen)))
+
+(use-package eglot
+  :hook ((c-mode c++-mode python-mode) . eglot-ensure)
+  :config
+  ;; Disable flymake (eglot enables it by default)
+  (add-hook 'eglot-managed-mode-hook (lambda () (flymake-mode -1)))
+
+  ;; Optional: disable eldoc hints if you want absolute minimalism
+  (setq eldoc-display-functions nil)
+
+  ;; Disable snippet support (eglot doesn’t send snippet capability by default anyway, so you're good)
+  ;; But you can be explicit:
+  (setq eglot-extend-to-xref nil))
+
+;; No auto-completion
+(setq completion-at-point-functions nil) ;; disables LSP + default CAPF
