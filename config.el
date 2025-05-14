@@ -61,6 +61,39 @@
 (set-default-coding-systems 'utf-8)               ; Default to utf-8 encoding
 (show-paren-mode 1)                               ; Show the parent
 
+;; flash area being acted on
+(use-package volatile-highlights
+  :init (volatile-highlights-mode t))
+
+;; where did my cursor go?
+(use-package beacon
+  :init (beacon-mode 1)
+  :custom
+  (beacon-color "#aaddff") ;; ocean blue vibe
+  (beacon-size 15)         ;; make it more visible
+  (beacon-blink-when-point-moves-vertically 5)
+  (beacon-blink-when-window-scrolls t))
+
+;; smooth scoll
+(when (fboundp 'pixel-scroll-precision-mode)
+  (pixel-scroll-precision-mode 1))
+
+(setq pixel-scroll-precision-interpolate-page t) ; smoother paging
+
+;; improve overall experience
+
+;; Cuts lag spikes when you're typing or scrolling fast.
+(use-package gcmh
+  :init (gcmh-mode 1))
+
+;; Cuts lag spikes when you're typing or scrolling fast.
+(use-package no-littering)
+
+;; Improves your minibuffer experience without runtime penalty.
+(use-package savehist
+  :init
+  (savehist-mode 1))
+
 
 (defvar xdg-bin (getenv "XDG_BIN_HOME")
 "The XDG bin base directory.")
@@ -85,8 +118,9 @@
 
 
 
-(set-face-attribute 'default nil :font "CaskaydiaCove NF")
-(set-fontset-font t 'latin "CaskaydiaCove NF")
+(set-face-attribute 'default nil :font "CaskaydiaCove NFM")
+(set-fontset-font t 'latin "CaskaydiaCove NFM")
+
 
 (use-package vterm
   :ensure t)
@@ -385,68 +419,17 @@
   (if (file-exists-p abbrev-file-name)
       (quietly-read-abbrev-file)))
 
-(use-package flyspell
-  :ensure nil
-  :delight
-  :hook ((text-mode . flyspell-mode)
-         (prog-mode . flyspell-prog-mode))
-  :custom
-  ;; Add correction to abbreviation table.
-  (flyspell-abbrev-p t)
-  (flyspell-default-dictionary "en_US")
-  (flyspell-issue-message-flag nil)
-  (flyspell-issue-welcome-flag nil))
-
-(use-package ispell
-  :preface
-  (defun my/switch-language ()
-    "Switch between the English and French for ispell, flyspell, and LanguageTool."
-    (interactive)
-    (let* ((current-dictionary ispell-current-dictionary)
-           (new-dictionary (if (string= current-dictionary "en_US") "fr_BE" "en_US")))
-      (ispell-change-dictionary new-dictionary)
-      (flyspell-buffer)
-      (message "[✓] Dictionary switched to %s" new-dictionary)))
-  :custom
-  (ispell-hunspell-dict-paths-alist
-   '(("en_US" "/usr/share/hunspell/en_US.aff")
-     ("fr_BE" "/usr/share/hunspell/fr_BE.aff")))
-  ;; Save words in the personal dictionary without asking.
-  (ispell-silently-savep t)
-  :config
-  (setenv "LANG" "en_US")
-  (cond ((executable-find "hunspell")
-         (setq ispell-program-name "hunspell")
-         (setq ispell-local-dictionary-alist '(("en_US"
-                                                "[[:alpha:]]"
-                                                "[^[:alpha:]]"
-                                                "['’-]"
-                                                t
-                                                ("-d" "en_US" )
-                                                nil
-                                                utf-8)
-                                               ("fr_BE"
-                                                "[[:alpha:]ÀÂÇÈÉÊËÎÏÔÙÛÜàâçèéêëîïôùûü]"
-                                                "[^[:alpha:]ÀÂÇÈÉÊËÎÏÔÙÛÜàâçèéêëîïôùûü]"
-                                                "['’-]"
-                                                t
-                                                ("-d" "fr_BE")
-                                                nil
-                                                utf-8))))
-        ((executable-find "aspell")
-         (setq ispell-program-name "aspell")
-         (setq ispell-extra-args '("--sug-mode=ultra"))))
-  ;; Ignore file sections for spell checking.
-  (add-to-list 'ispell-skip-region-alist '("#\\+begin_align" . "#\\+end_align"))
-  (add-to-list 'ispell-skip-region-alist '("#\\+begin_align*" . "#\\+end_align*"))
-  (add-to-list 'ispell-skip-region-alist '("#\\+begin_equation" . "#\\+end_equation"))
-  (add-to-list 'ispell-skip-region-alist '("#\\+begin_equation*" . "#\\+end_equation*"))
-  (add-to-list 'ispell-skip-region-alist '("#\\+begin_example" . "#\\+end_example"))
-  (add-to-list 'ispell-skip-region-alist '("#\\+begin_labeling" . "#\\+end_labeling"))
-  (add-to-list 'ispell-skip-region-alist '("#\\+begin_src" . "#\\+end_src"))
-  (add-to-list 'ispell-skip-region-alist '("\\$" . "\\$"))
-  (add-to-list 'ispell-skip-region-alist '(org-property-drawer-re))
-  (add-to-list 'ispell-skip-region-alist '(":\\(PROPERTIES\\|LOGBOOK\\):" . ":END:")))
+;; (use-package flyspell
+;;   :ensure nil
+;;   :delight
+;;   :hook ((text-mode . flyspell-mode)
+;;          (prog-mode . flyspell-prog-mode))
+;;   :custom
+;;   ;; Add correction to abbreviation table.
+;;   (flyspell-abbrev-p t)
+;;   (flyspell-default-dictionary "en_US")
+;;   (flyspell-issue-message-flag nil)
+;;   (flyspell-issue-welcome-flag nil))
 
 (use-package sh-script
   :ensure nil
@@ -511,26 +494,26 @@
   (advice-add 'gradle-build :after #'my/switch-to-compilation-window)
   (advice-add 'gradle-test :after #'my/switch-to-compilation-window))
 
-(use-package js2-mode
-  :ensure flycheck
-  :mode "\\.js\\'"
-  :hook ((js2-mode . js2-imenu-extras-mode)
-         (js2-mode . prettier-js-mode))
-  :custom (js-indent-level 2)
-  :config (flycheck-add-mode 'javascript-eslint 'js2-mode))
+;; (use-package js2-mode
+;;   :ensure flycheck
+;;   :mode "\\.js\\'"
+;;   :hook ((js2-mode . js2-imenu-extras-mode)
+;;          (js2-mode . prettier-js-mode))
+;;   :custom (js-indent-level 2)
+;;   :config (flycheck-add-mode 'javascript-eslint 'js2-mode))
 
-(use-package prettier-js
-  :delight
-  :custom (prettier-js-args '("--print-width" "100"
-                              "--single-quote" "true"
-                              "--trailing-comma" "all")))
+;; (use-package prettier-js
+;;   :delight
+;;   :custom (prettier-js-args '("--print-width" "100"
+;;                               "--single-quote" "true"
+;;                               "--trailing-comma" "all")))
 
-(use-package js2-refactor
-  :hook (js2-mode . js2-refactor-mode)
-  :bind (:map js2-mode-map
-              ("C-k" . js2r-kill)))
+;; (use-package js2-refactor
+;;   :hook (js2-mode . js2-refactor-mode)
+;;   :bind (:map js2-mode-map
+;;               ("C-k" . js2r-kill)))
 
-(use-package yarn-mode :mode "yarn\\.lock\\'")
+;; (use-package yarn-mode :mode "yarn\\.lock\\'")
 
 (use-package json-mode
   :delight "J"
@@ -607,9 +590,7 @@
                  "9.15.6/highlight.min.js")
          "<script>
             $(document).on('mdContentChange', function() {
-              $('pre code').each(function(i, block)  {
-                hljs.highlightBlock(block);
-              });
+    $('pre code').each(function(i, block) { hljs.highlightBlock(block); });
             });
           </script>"))
   (markdown-preview-stylesheets
@@ -620,14 +601,18 @@
 
          "<style>
             .markdown-body {
-              box-sizing: border-box;
-              min-width: 200px;
-              max-width: 980px;
-              margin: 0 auto;
-              padding: 45px;
+    box - sizing : border - box;
+    min - width : 200px;
+    max - width : 980px;
+margin:
+    0 auto;
+padding:
+    45px;
             }
 
-            @media (max-width: 767px) { .markdown-body { padding: 15px; } }
+            @media (max-width: 767px) { .markdown-body { padding: 15px;
+}
+}
           </style>")))
 
 (use-package web-mode
@@ -758,14 +743,6 @@
 (use-package nameless)
 (use-package elsa)
 (use-package flycheck-package)
-
-
-(defun maybe-clang-format ()
-  (when (locate-dominating-file default-directory ".clang-format")
-    (clang-format-buffer)))
-
-(add-hook 'before-save-hook 'maybe-clang-format)
-
 
 (use-package paredit)
 
@@ -1640,3 +1617,6 @@
 
 ;; No auto-completion
 (setq completion-at-point-functions nil) ;; disables LSP + default CAPF
+
+;; disable formatting on save
+;; (remove-hook 'before-save-hook #'eglot-format-buffer t)
