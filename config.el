@@ -562,19 +562,6 @@
 
 (setq-default TeX-engine 'xetex)
 
-(use-package reftex
-  :ensure nil
-  :custom
-  (reftex-save-parse-info t)
-  (reftex-use-multiple-selection-buffers t))
-
-(use-package bibtex
-  :ensure nil
-  :preface
-  (defun my/bibtex-fill-column ()
-    "Ensure that each entry does not exceed 120 characters."
-    (setq fill-column 120)))
-
 (use-package lua-mode :delight "Λ" :mode "\\.lua\\'")
 
 (use-package markdown-mode
@@ -715,11 +702,6 @@ padding:
   :config
   (flycheck-add-mode 'javascript-eslint 'typescript-mode))
 
-(use-package vue-mode
-  :delight "V"
-  :mode "\\.vue\\'"
-  :custom (vue-html-extra-indent 2))
-
 (use-package nxml-mode
   :ensure nil
   :mode ("\\.\\(xml\\|xsd\\|wsdl\\)\\'"))
@@ -734,7 +716,7 @@ padding:
 (use-package slime)
 
 ;; Lisp configuration
-(define-key read-expression-map (kbd "TAB") 'completion-at-point)
+;; (define-key read-expression-map (kbd "TAB") 'completion-at-point)
 
 (use-package highlight-defined)
 (use-package highlight-quoted)
@@ -807,14 +789,6 @@ padding:
   :custom
   (rust-format-on-save t)
   :bind (:map rust-mode-map ("C-c C-c" . rust-run)))
-
-
-
-(use-package browse-url
-  :ensure nil
-  :custom
-  (browse-url-browser-function 'browse-url-generic)
-  (browse-url-generic-program "qutebrowser"))
 
 (use-package calc
   :ensure nil
@@ -1544,6 +1518,25 @@ padding:
 (use-package ob-shell :ensure nil :after org)
 (use-package ob-sql :ensure nil :after org)
 
+(use-package eglot
+  :hook ((c-mode c++-mode python-mode) . eglot-ensure)
+  :config
+  ;; Disable flymake (eglot enables it by default)
+  (add-hook 'eglot-managed-mode-hook (lambda () (flymake-mode -1)))
+
+  ;; Optional: disable eldoc hints if you want absolute minimalism
+  (setq eldoc-display-functions nil)
+
+  ;; Disable snippet support (eglot doesn’t send snippet capability by default anyway, so you're good)
+  ;; But you can be explicit:
+  (setq eglot-extend-to-xref nil))
+
+;; No auto-completion
+(setq completion-at-point-functions nil) ;; disables LSP + default CAPF
+
+;; disable formatting on save
+;; (remove-hook 'before-save-hook #'eglot-format-buffer t)
+
 (use-package org-roam
   :after org
   :init
@@ -1593,30 +1586,12 @@ padding:
   ;; (setq lsp-mode-indent-offset 4)
   )
 
-(add-hook 'c-mode-common-hook 'my-programming-mode-hook)
-(add-hook 'js-mode-hook 'my-programming-mode-hook)
-(add-hook 'python-mode-hook 'my-programming-mode-hook)
-(add-hook 'web-mode-hook 'my-programming-mode-hook)
+(add-hook 'eglot-mode-hook 'my-programming-mode-hook)
+(add-hook 'programming-mode-hook 'my-programming-mode-hook)
+
 ;; (add-hook 'lsp-mode-hook 'my-programming-mode-hook)
 
 (setq c-doc-comment-style '((c-mode . doxygen)
                             (c++-mode . doxygen)))
 
-(use-package eglot
-  :hook ((c-mode c++-mode python-mode) . eglot-ensure)
-  :config
-  ;; Disable flymake (eglot enables it by default)
-  (add-hook 'eglot-managed-mode-hook (lambda () (flymake-mode -1)))
 
-  ;; Optional: disable eldoc hints if you want absolute minimalism
-  (setq eldoc-display-functions nil)
-
-  ;; Disable snippet support (eglot doesn’t send snippet capability by default anyway, so you're good)
-  ;; But you can be explicit:
-  (setq eglot-extend-to-xref nil))
-
-;; No auto-completion
-(setq completion-at-point-functions nil) ;; disables LSP + default CAPF
-
-;; disable formatting on save
-;; (remove-hook 'before-save-hook #'eglot-format-buffer t)
