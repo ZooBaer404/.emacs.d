@@ -1586,8 +1586,11 @@ padding:
   ;; (setq lsp-mode-indent-offset 4)
   )
 
-(add-hook 'eglot-mode-hook 'my-programming-mode-hook)
-(add-hook 'programming-mode-hook 'my-programming-mode-hook)
+
+(add-hook 'c-mode-common-hook 'my-programming-mode-hook)
+(add-hook 'js-mode-hook 'my-programming-mode-hook)
+(add-hook 'python-mode-hook 'my-programming-mode-hook)
+(add-hook 'web-mode-hook 'my-programming-mode-hook)
 
 ;; (add-hook 'lsp-mode-hook 'my-programming-mode-hook)
 
