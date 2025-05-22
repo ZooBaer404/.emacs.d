@@ -47,7 +47,35 @@
 
 ;; Completion
 
+(use-package vertico
+  :init
+  (vertico-mode))
 
+;;; completion annotations
+(use-package marginalia
+  :after vertico
+  :init
+  (marginalia-mode))
+
+;;; sorting and filtering
+(use-package orderless
+  :custom
+  (completion-style '(orderless basic))
+  (completion-category-defaults nil)
+  (completion-category-overrides
+   '((file (styles partial-completion)))))
+
+;;; enhanced M-x, buffer-switching, find file
+(use-package consult)
+
+;;; show keybinding hints & minibuffer help
+(use-package embark
+  :bind
+  (("C-." . embark-act)))
+
+(use-package embark-consult
+  :hook
+  (embark-collect-mode . consult-preview-at-point-mode))
 
 
 ;; Languages
