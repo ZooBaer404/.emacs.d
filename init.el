@@ -99,6 +99,33 @@
 
 (use-package counsel)
 
+(use-package hungry-delete
+  :ensure t
+  :config
+  (global-hungry-delete-mode))
+
+(use-package surround
+  :ensure t
+  :bind-keymap ("C-c s" . surround-keymap))
+
+
+
+;; -------------------------------
+;; Shell
+;; -------------------------------
+
+(use-package vterm
+    :ensure t)
+
+
+;; -------------------------------
+;; Mode Settings
+;; -------------------------------
+
+(add-to-list 'auto-mode-alist '("\\.org\\'" . org-mode))
+(add-to-list 'auto-mode-alist '("\\.cl\\'" . lisp-mode))
+(add-to-list 'auto-mode-alist '("\\.lisp\\'" . lisp-mode))
+(add-to-list 'auto-mode-alist '("\\.sbclrc\\'" . lisp-mode))
 
 ;; ------------------------------
 ;; Completion
@@ -170,22 +197,21 @@
 
 ;;;; Functions
 
-(defun set-indent (mode tab-width &optional use-tabs)
+(defun set-indent (mode tab-width electric-pair &optional use-tabs)
   "Helper to set indentation for MODE."
   (add-hook mode
             (lambda ()
               (setq tab-width tab-width
+		    electric-pair-mode electric-pair
                     indent-tabs-mode (if use-tabs t nil)))))
 
 ;;;; Pair
 
 (use-package smartparens
-  :hook ((prog-mode . smartparens-mode)
-         (text-mode . smartparens-mode))
+  :hook ((text-mode . smartparens-mode))
   :config
   (require 'smartparens-config)
   (show-smartparens-global-mode +1))
-
 
 ;;;; Basic LSP
 
@@ -255,7 +281,7 @@
 (use-package go-mode
   :mode ("\\.go\\'" "\\.mod'"))
 
-(set-indent 'go-mode-hook 4 t) ;; Go prefers tabs
+(set-indent 'go-mode-hook 4 t t) ;; Go prefers tabs
 
 
 ;;; Python
@@ -263,7 +289,7 @@
 (use-package python
   :mode "\\.py\\'")
 
-(set-indent 'python-mode-hook 4 nil)
+(set-indent 'python-mode-hook 4 t nil)
 
 
 ;;;; Function Signature and auto-import
@@ -277,7 +303,7 @@
   :ensure nil
   :mode "\\.java\\'")
 
-(set-indent 'java-mode-hook 4 t)
+(set-indent 'java-mode-hook 4 t t)
 
 ;;; Lisp
 
@@ -294,21 +320,17 @@
                 lisp-mode-hook
                 lisp-interaction-mode-hook
                 scheme-mode-hook
+		slime-repl-mode-hook
                 clojure-mode-hook))
   (add-hook hook (lambda ()
-                   (smartparens-strict-mode +1))))
+		   (electric-pair-mode -1)
+                   (smartparens-strict-mode +1)
+		   (rainbow-delimiters-mode +1)
+		   (hungry-delete-mode -1))))
 
 (dolist (hook '(lisp-interaction-mode-hook)))
 
-
-
-
 ;;;; Common Lisp
-
-
-(add-to-list 'auto-mode-alist '("\\.cl\\'" . lisp-mode))
-(add-to-list 'auto-mode-alist '("\\.lisp\\'" . lisp-mode))
-(add-to-list 'auto-mode-alist '("\\.sbclrc\\'" . lisp-mode))
 
 (use-package slime
 
@@ -361,9 +383,7 @@
 
 
 (defun my/common-lisp-setup ()
-  (slime-mode +1)
-  (smartparens-strict-mode +1)
-  (rainbow-delimiters-mode +1))
+  (slime-mode +1))
 
 (add-hook 'lisp-mode-hook #'my/common-lisp-setup)
 
@@ -383,7 +403,7 @@
   :ensure t
   :mode "\\.lua\\'")
 
-(set-indent 'lua-mode-hook 4 t)
+(set-indent 'lua-mode-hook 4 t t)
 
 ;;; Zig
 
@@ -391,7 +411,7 @@
   :ensure t
   :mode "\\.zig\\'")
 
-(set-indent 'zig-mode-hook 4 t)
+(set-indent 'zig-mode-hook 4 t t)
 
 ;;; JSON
 
@@ -399,7 +419,7 @@
   :ensure t
   :mode "\\.json\\'")
 
-(set-indent 'json-mode-hook 2 nil)
+(set-indent 'json-mode-hook 2 t nil)
 
 ;;; Markdown
 
@@ -408,7 +428,7 @@
   :ensure t
   :mode "\\.md\\'")
 
-(set-indent 'markdown-mode-hook 2 nil)
+(set-indent 'markdown-mode-hook 2 t nil)
 
 
 ;;; Shell
@@ -417,7 +437,7 @@
   :ensure nil
   :mode ("\\.sh\\'" . sh-mode))
 
-(set-indent 'sh-mode-hook 2 nil)
+(set-indent 'sh-mode-hook 2 t nil)
 
 ;;; Powershell
 
@@ -425,7 +445,7 @@
   :ensure t
   :mode ("\\.ps1\\'" . powershell-mode))
 
-(set-indent 'powershell-mode-hook 4 nil)
+(set-indent 'powershell-mode-hook 4 t nil)
 
 ;;; 
 
@@ -433,15 +453,45 @@
 ;; Org
 ;; -------------------------
 
-(use-package org)
+(defun zoobaer/org-mode-setup ()
+  (org-indent-mode)
+  (visual-line-mode 1))
 
+(use-package org
+  :hook (org-mode . zoobaer/org-mode-setup)
+  :config
+  (setq org-ellipsis " ▾")
 
+  :bind (("C-c a" . org-agenda)
+         ("C-c b" . org-switchb)
+         ("C-c x" . org-capture)))
 
+(use-package org-bullets
+  :hook ((org-mode . org-bullets-mode)))
 
+(defun zoobaer/org-font-setup()
+  (dolist (face '((org-level-1 . 1.2)
+                  (org-level-2 . 1.1)
+                  (org-level-3 . 1.05)
+                  (org-level-4 . 1.0)
+                  (org-level-5 . 1.1)
+                  (org-level-6 . 1.1)
+                  (org-level-7 . 1.1)
+                  (org-level-8 . 1.1))))
+
+  (set-face-attribute 'org-block nil :foreground nil :inherit 'fixed-pitch)
+  (set-face-attribute 'org-code nil   :inherit '(shadow fixed-pitch))
+  (set-face-attribute 'org-table nil   :inherit '(shadow fixed-pitch))
+  (set-face-attribute 'org-verbatim nil :inherit '(shadow fixed-pitch))
+  (set-face-attribute 'org-special-keyword nil :inherit '(font-lock-comment-face fixed-pitch))
+  (set-face-attribute 'org-meta-line nil :inherit '(font-lock-comment-face fixed-pitch))
+  (set-face-attribute 'org-checkbox nil :inherit 'fixed-pitch))
 
 (dolist (mode '(text-mode org-mode))
   (add-hook mode (lambda () (electric-indent-local-mode -1))))
 
+(add-hook 'message-mode-hook #'turn-on-orgtbl)
+(add-hook 'prog-mode #'turn-on-orgtbl)
 
 
 ;; -------------------------
