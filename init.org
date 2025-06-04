@@ -1,0 +1,3865 @@
+#+title: Emacs Configuration
+#+PROPERTY: header-args:emacs-lisp :tangle ./init.el :mkdirp yes
+
+* Yo!!!
+How are you in my Emacs configs? How did you end up here?
+Hope you have good time finding what are you looking for!
+
+Thanks to [[https://github.com/zzamboni][zzamboni]] for being such a help with providing his [[https://github.com/zzamboni/dot-emacs][configs]].
+
+* Tips for Use
+
+If you see a link in this config and are using Emacs, press =C-c C-o= or run =M-x org-open-at-point= to open the link in your web browser.
+Wanna export the config so that Emacs can understand it? Press ==C-c C-v t==
+
+* References
+
+Emacs config is an art, and I have learned a lot by reading through other people's config files, and from many other resources. These are some of the best ones (several are also written in org mode). You will find snippets from all of these (and possibly others) throughout my config.
+
+- [[http://pages.sachachua.com/.emacs.d/Sacha.html][Sacha Chua's Emacs Configuration]]
+- [[https://github.com/daedreth/UncleDavesEmacs#user-content-ido-and-why-i-started-using-helm][Uncle Dave's Emacs config]]
+- [[https://github.com/PythonNut/emacs-config][PythonNut's Emacs config]]
+- [[https://www.masteringemacs.org/][Mastering Emacs]]
+* Performance optimization
+
+Lately I've been playing with optimizing my Emacs load time. I have found a couple of useful resources, including:
+
+- [[https://www.reddit.com/r/emacs/comments/3kqt6e/2_easy_little_known_steps_to_speed_up_emacs_start/][Two easy little known steps to speed up Emacs start up time]]
+- [[https://blog.d46.us/advanced-emacs-startup/][Advanced Techniques for Reducing Emacs Startup Time]]
+
+Based on these, I have added the code below.
+
+First, we wrap the whole init file in a block that sets =file-name-handler-alist= to =nil= to prevent any special-filename parsing of files loaded from the init file (e.g. remote files loaded through tramp, etc.). The =let= block gets closed in the [[Epilogue][Epilogue]].
+
+
+* Alright, First Things First
+
+First, we wrap the whole init file in a block that sets =file-name-handler-alist= to =nil= to prevent any special-filename parsing of files loaded from the init file (e.g. remote files loaded through tramp, etc.). The =let= block gets closed in the [[Epilogue][Epilogue]].
+
+#+begin_src emacs-lisp
+  (let ((file-name-handler-alist nil)))
+#+end_src
+
+Next, a hook that reports how long and how many garbage collections the startup took. We use a hook to run it at the very end, so the message doesn't get clobbered by other messages during startup.
+
+#+begin_src emacs-lisp
+  (add-hook 'emacs-startup-hook
+    (lambda ()
+              (message "Emacs ready in %s with %d garbage collections."
+                       (format "%.2f seconds"
+                               (float-time
+                                (time-subtract after-init-time before-init-time)))
+                       gcs-done)))
+#+end_src
+
+We set =gc-cons-threshold= to its maximum value, to prevent any garbage collection from happening during load time. We also reset this value in the [[Epilogue][Epilogue]].
+
+#+begin_src emacs-lisp
+  (setq gc-cons-threshold most-positive-fixnum)
+#+end_src
+
+* Debug Mode
+
+Turn on if you are changing your configs. Really helpful!!!
+
+#+begin_src emacs-lisp
+  (setq debug-on-error t)
+#+end_src
+
+* Package System
+
+Emacs has a built in package manager but it doesn't make it easy to automatically install packages on a new system the first time you pull down your configuration.  [[https://github.com/jwiegley/use-package][use-package]] is a really helpful package used in this configuration to make it a lot easier to automate the installation and configuration of everything else we use.
+
+
+We set some configuration for =use-package=:
+
+- The =use-package-always-ensure= variable indicates that =use-package= should always try to install missing packages. For some libraries this is not appropriate, and in those cases you see the =:ensure nil= declaration as part of the =use-package= statement. This applies mainly to libraries which are installed as part of some other package (happens mostly with some libraries that come with org-mode).
+
+#+begin_src emacs-lisp
+  (require 'package)
+  (setq package-archives '(("melpa" . "https://melpa.org/packages/")
+    			                  ("org"   . "https://orgmode.org/elpa/")
+    			                  ("elpa"  . "https://elpa.gnu.org/packages/")
+    												("nongnu" . "https://elpa.nongnu.org/nongnu/")))
+  (package-initialize)
+  (unless package-archive-contents
+    (package-refresh-contents))
+
+    ;;;; Initialize use-package on non-linux platforms
+  (unless (package-installed-p 'use-package)
+    (package-install 'use-package))
+
+  (require 'use-package)
+  (setq use-package-always-ensure t)
+  (custom-set-variables '(use-package-always-defer t))
+  (custom-set-variables '(use-package-verbose nil))
+#+end_src
+
+Giving a try to [[https://github.com/Malabarba/paradox][Paradox]] for an enhanced package management interface. We set =paradox-github-token= to =t= to disable GitHub integration (I don't want to star  repos).
+
+#+begin_src emacs-lisp
+(use-package paradox
+  :ensure t
+  :defer nil
+  :custom
+  (paradox-github-token t)
+  :config
+  (paradox-enable))
+#+end_src
+
+* Startup Settings
+
+This variable tells Emacs to prefer the =.el= file if it's newer, even if there is a corresponding =.elc= file. Also, use =auto-compile= to autocompile files as needed.
+
+#+begin_src emacs-lisp
+  (custom-set-variables '(load-prefer-newer t))
+
+  (require 'custom)
+
+  (use-package auto-compile
+    :ensure t
+    :defer nil
+    :config (auto-compile-on-load-mode))
+#+end_src
+
+* Miscellaneous settings
+** General settings
+
+Prevent asking for confirmation to kill processes when exiting.
+
+#+begin_src emacs-lisp
+  (custom-set-variables '(confirm-kill-processes nil))
+#+end_src
+
+** Proxy settings
+
+These are two short functions I wrote to be able to set/unset proxy settings within Emacs. I haven't bothered to improve or automate this, as I pretty much only need it to be able to install packages sometimes when I'm at work. For now I just call them manually with =M-x zz/(un)set-proxy= when I need to.
+
+#+begin_src emacs-lisp
+  (defun zz/set-proxy ()
+    (interactive)
+    (customize-set-variable 'url-proxy-services
+      '(("http"  . "proxy.corproot.net:8079")
+         ("https" . "proxy.corproot.net:8079"))))
+  (defun zz/unset-proxy ()
+    (interactive)
+    (customize-set-variable 'url-proxy-services nil))
+#+end_src
+
+
+- Set default encoding.
+
+  #+begin_src emacs-lisp
+    (set-language-environment "UTF-8")
+    (prefer-coding-system       'utf-8)
+    (set-default-coding-systems 'utf-8)
+    (set-terminal-coding-system 'utf-8)
+    (set-keyboard-coding-system 'utf-8)
+    (setq default-buffer-file-coding-system 'utf-8)
+  #+end_src
+
+- Load the =cl= library to enable some additional macros (e.g. =lexical-let=).
+
+  #+begin_src emacs-lisp
+    (require 'cl)
+  #+end_src
+
+- Install and load the =async= package to enable asynchronous operations (this gets loaded by some other packages, but I use it explicitly in =zz/org-babel-async-tangle= below, so I load it explicitly).
+
+  #+begin_src emacs-lisp
+    (use-package async
+      :ensure t)
+  #+end_src
+
+- This is probably one of my oldest settings - I remember adding it around 1993 when I started learning Emacs, and it has been in my config ever since. When =time-stamp= is run before every save, the string =Time-stamp: <>= in the first 8 lines of the file will be updated with the current timestamp.
+
+  #+begin_src emacs-lisp
+    (add-hook 'before-save-hook 'time-stamp)
+  #+end_src
+
+- When at the beginning of the line, make =Ctrl-K= remove the whole line, instead of just emptying it.
+
+  #+begin_src emacs-lisp
+    (custom-set-variables '(kill-whole-line t))
+  #+end_src
+
+- Paste text where the cursor is, not where the mouse is.
+
+  #+begin_src emacs-lisp
+    (custom-set-variables '(mouse-yank-at-point t))
+  #+end_src
+
+- Make completion case-insensitive.
+
+  #+begin_src emacs-lisp
+    (setq completion-ignore-case t)
+    (custom-set-variables
+    	'(read-buffer-completion-ignore-case t)
+    	'(read-file-name-completion-ignore-case t))
+  #+end_src
+
+- Show line numbers. I used =linum-mode= before, but it caused severe performance issues on large files. Emacs 26 introduces =display-line-numbers-mode=, which has no perceivable performance impact even on very large files. Disabled for now.
+
+  #+begin_src emacs-lisp :tangle no
+    ((global-display-line-numbers-mode 1))
+  #+end_src
+
+- Highlight trailing whitespace in red, so it's easily visible (disabled  for now as it created a lot of noise in some modes, e.g. the org-mode export screen)
+
+  #+begin_src emacs-lisp
+    (custom-set-variables '(show-trailing-whitespace nil))
+  #+end_src
+
+- Highlight matching parenthesis
+
+  #+begin_src emacs-lisp
+    (show-paren-mode)
+  #+end_src
+
+- Don't use hard tabs
+
+  #+begin_src emacs-lisp
+    (custom-set-variables '(indent-tabs-mode nil))
+  #+end_src
+
+- Emacs automatically creates backup files, by default in the same folder as the original file, which often leaves backup files behind. This tells Emacs to [[http://www.gnu.org/software/emacs/manual/html_node/elisp/Backup-Files.html][put all backups in ~/.emacs.d/backups]].
+
+  #+begin_src emacs-lisp
+    (custom-set-variables
+    	'(backup-directory-alist
+    		 `(("." . ,(concat user-emacs-directory "backups")))))
+  #+end_src
+
+- [[http://emacswiki.org/emacs/WinnerMode][WinnerMode]] makes it possible to cycle and undo window configuration changes (i.e. arrangement of panels, etc.)
+
+  #+begin_src emacs-lisp
+    (when (fboundp 'winner-mode) (winner-mode))
+  #+end_src
+
+- Add "unfill" commands to parallel the "fill" ones, bind ~A-q~ to =unfill-paragraph= and rebind ~M-q~ to the =unfill-toggle= command, which fills/unfills paragraphs alternatively.
+
+  #+begin_src emacs-lisp
+    (use-package unfill
+      :bind
+      ("M-q" . unfill-toggle)
+      ("A-q" . unfill-paragraph))
+  #+end_src
+
+- Save the place of the cursor in each file, and restore it upon opening it again.
+
+  #+begin_src emacs-lisp
+    (use-package saveplace
+      :defer nil
+      :config
+      (save-place-mode))
+  #+end_src
+
+- Provide mode-specific "bookmarks" - press =M-i= and you will be presented with a list of elements to which you can navigate - they can be headers in org-mode, function names in emacs-lisp, etc.
+
+  #+begin_src emacs-lisp
+    (use-package imenu-anywhere
+      :bind
+      ("M-i" . helm-imenu-anywhere))
+  #+end_src
+
+- Smooth scrolling (line by line) instead of jumping by half-screens.
+
+  #+begin_src emacs-lisp
+    (use-package smooth-scrolling
+      :ensure t
+      :config
+      (smooth-scrolling-mode 1))
+  #+end_src
+
+- Delete trailing whitespace before saving a file.
+
+  #+begin_src emacs-lisp
+    (add-hook 'before-save-hook 'delete-trailing-whitespace)
+  #+end_src
+
+- Suppress "ad-handle-definition: .. redefined" warnings during Emacs startup.
+
+  #+begin_src emacs-lisp
+    (custom-set-variables '(ad-redefinition-action (quote accept)))
+  #+end_src
+
+* System-specific configuration
+
+Some settings maybe OS-specific, and this is where we set them. For now I only use Emacs on my Mac, so only the Mac section is filled out, but there are sections for Linux and Windows as well.
+
+#+begin_src emacs-lisp :noweb no-export
+  (cond ((eq system-type 'darwin)
+  				<<Mac settings>>
+  				)
+    ((eq system-type 'windows-nt)
+      <<Windows settings>>
+      )
+    ((eq system-type 'gnu/linux)
+      <<Linux settings>>
+      ))
+#+end_src
+
+** Linux
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref Linux settings
+:END:
+
+There are no Linux-specific settings for now.
+
+** Windows
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle no :noweb-ref Windows settings
+:END:
+
+There are no Windows-specific settings for now.
+
+* Diminish
+
+The =diminish= package makes it possible to remove clutter from the modeline. Here we just load it, it gets enabled for individual packages in their corresponding declarations.
+
+#+begin_src emacs-lisp
+  (use-package diminish
+    :ensure t)
+#+end_src
+
+* Keybindings
+
+The [[https://github.com/justbur/emacs-which-key][which-key]] package makes Emacs functionality much easier to discover and explore: in short, after you start the input of a command and stop, pondering what key must follow, it will automatically open a non-intrusive buffer at the bottom of the screen offering you suggestions for completing the command. Extremely useful.
+
+#+begin_src emacs-lisp
+(use-package which-key
+  :defer nil
+  :diminish which-key-mode
+  :config
+  (which-key-mode))
+#+end_src
+
+
+** Emulating vi's =%= key
+
+One of the few things I missed in Emacs from vi was the =%= key, which jumps to the parenthesis, bracket or brace which matches the one below the cursor. This function implements the functionality. Inspired by [[http://www.emacswiki.org/emacs/NavigatingParentheses]], but modified to use =smartparens= instead of the default commands, and to work on brackets and braces.
+
+#+begin_src emacs-lisp
+  (defun zz/goto-match-paren (arg)
+    "Go to the matching paren/bracket, otherwise (or if ARG is not
+      nil) insert %.  vi style of % jumping to matching brace."
+    (interactive "p")
+    (if (not (memq last-command '(set-mark
+                                   cua-set-mark
+                                   zz/goto-match-paren
+                                   down-list
+                                   up-list
+                                   end-of-defun
+                                   beginning-of-defun
+                                   backward-sexp
+                                   forward-sexp
+                                   backward-up-list
+                                   forward-paragraph
+                                   backward-paragraph
+                                   end-of-buffer
+                                   beginning-of-buffer
+                                   backward-word
+                                   forward-word
+                                   mwheel-scroll
+                                   backward-word
+                                   forward-word
+                                   mouse-start-secondary
+                                   mouse-yank-secondary
+                                   mouse-secondary-save-then-kill
+                                   move-end-of-line
+                                   move-beginning-of-line
+                                   backward-char
+                                   forward-char
+                                   scroll-up
+                                   scroll-down
+                                   scroll-left
+                                   scroll-right
+                                   mouse-set-point
+                                   next-buffer
+                                   previous-buffer
+                                   previous-line
+                                   next-line
+                                   back-to-indentation
+                                   )))
+      (self-insert-command (or arg 1))
+      (cond ((looking-at "\\s\(") (sp-forward-sexp) (backward-char 1))
+        ((looking-at "\\s\)") (forward-char 1) (sp-backward-sexp))
+        (t (self-insert-command (or arg 1))))))
+#+end_src
+
+We bind this function to the =%= key.
+
+#+begin_src emacs-lisp
+(bind-key "%" 'zz/goto-match-paren)
+#+end_src
+
+** Moving Stuff Around
+
+Visual Studio has this feature for moving a line or region up and down which is very handy in some situations.
+
+#+begin_src emacs-lisp
+
+  (use-package drag-stuff
+    :ensure t
+    :config
+    (global-set-key (kbd "M-p") 'drag-stuff-up)
+    (global-set-key (kbd "M-n") 'drag-stuff-down))
+
+#+end_src
+
+* Appearance, buffer/file management and Theming
+
+UI configuration will make it easier to make Emacs look beautiful, you know....I don't know what to say.
+
+Here we take care of all the visual, UX and desktop-management settings.
+
+You'll notice that many of the packages in this section have =:defer nil=. This is because some of these package are never called explicitly because they operate in the background, but I want them loaded when Emacs starts so they can perform their necessary customization.
+
+** Default
+
+#+begin_src emacs-lisp
+  (setq use-file-dialog nil
+    use-dialog-box nil
+    inhibit-startup-screen t
+    inhibit-startup-echo-area-message user-login-name
+    inhibit-default-init t)
+  (tool-bar-mode -1)   ; Disable the toolbar
+  (set-fringe-mode 10) ; Give some breating room
+  (menu-bar-mode -1)   ; Disable the menu bar
+  (setq visual-bell t)  ; Set up the visual bell
+  (savehist-mode 1) ; Preserve minibuffer history across sessions
+  (recentf-mode 1)  ; Access recent files quickly
+
+
+    ;;; Inhibit resizing frame
+  (setq frame-inhibit-implied-resize t
+    frame-resize-pixelwise t)
+
+  ;; Display dividers between windows
+  (setq window-divider-default-places t
+    window-divider-default-bottom-width 1
+    window-divider-default-right-width 1)
+  (add-hook 'window-setup-hook #'window-divider-mode)
+
+  ;;; Display ugly ^L page breaks as tidy horizontal lines
+  (use-package page-break-lines
+    :diminish
+    :hook (after-init . global-page-break-lines-mode)
+    :config (dolist (mode '(dashboard-mode emacs-news-mode))
+              (add-to-list 'page-break-lines-modes mode)))
+
+  ;;; Use fixed pitch where it's sensible
+  (use-package mixed-pitch
+    :ensure t
+    :diminish)
+
+#+end_src
+
+** Font
+
+#+begin_src emacs-lisp
+  (add-to-list 'default-frame-alist
+               '(font . "CaskaydiaCove NF 10"))
+
+  (set-face-attribute 'default nil :font "CaskaydiaCove NF" :height 10)
+  (set-face-attribute 'fixed-pitch nil :font "CaskaydiaCove NF" :height 10)
+  (set-face-attribute 'variable-pitch nil :font "CaskaydiaCove NF" :height 10)
+#+end_src
+
+** Pixel Scrolling
+
+#+begin_src emacs-lisp
+(when (>= emacs-major-version 26)
+  (pixel-scroll-mode))
+#+end_src
+
+** Dashboard
+
+#+begin_src emacs-lisp
+  (use-package dashboard
+    :ensure t
+    :config
+    (dashboard-setup-startup-hook))
+
+  ;; Set the title
+  (setq dashboard-banner-logo-title "Welcome to Emacs Dashboard")
+  ;; Set the banner
+  (setq dashboard-startup-banner [VALUE])
+  ;; Value can be:
+  ;;  - 'official which displays the official emacs logo.
+  ;;  - 'logo which displays an alternative emacs logo.
+  ;;  - an integer which displays one of the text banners
+  ;;    (see dashboard-banners-directory files).
+  ;;  - a string that specifies a path for a custom banner
+  ;;    currently supported types are gif/image/text/xbm.
+  ;;  - a cons of 2 strings which specifies the path of an image to use
+  ;;    and other path of a text file to use if image isn't supported.
+  ;;    (cons "path/to/image/file/image.png" "path/to/text/file/text.txt").
+  ;;  - a list that can display an random banner,
+  ;;    supported values are: string (filepath), 'official, 'logo and integers.
+
+  ;; Content is not centered by default. To center, set
+  (setq dashboard-center-content t)
+  ;; vertically center content
+  (setq dashboard-vertically-center-content t)
+
+  ;; To disable shortcut "jump" indicators for each section, set
+  (setq dashboard-show-shortcuts nil)
+
+  (setq dashboard-items '((recents   . 5)
+    			(bookmarks . 5)
+    			(projects  . 5)
+    			(agenda    . 5)
+    			(registers . 5)))
+  ;; To customize which widgets to display in order (example: Banner, footer message …):
+  (setq dashboard-startupify-list '(dashboard-insert-banner
+                                    dashboard-insert-newline
+                                    dashboard-insert-banner-title
+                                    dashboard-insert-newline
+                                    dashboard-insert-navigator
+                                    dashboard-insert-newline
+                                    dashboard-insert-init-info
+                                    dashboard-insert-items
+                                    dashboard-insert-newline
+                                    dashboard-insert-footer))
+  ;; To enable cycle navigation between each section:
+  (setq dashboard-navigation-cycle t)
+
+  ;; To customize string format in shortcuts:
+  (setq dashboard-heading-shorcut-format " [%s]")
+
+  ;; To customize item shortcuts:
+  (setq dashboard-item-shortcuts '((recents   . "r")
+  				 (bookmarks . "m")
+  				 (projects  . "p")
+  				 (agenda    . "a")
+  				 (registers . "e")))
+
+  (setq dashboard-item-names '(("Recent Files:"               . "Recently opened files:")
+  			     ("Agenda for today:"           . "Today's agenda:")
+  			     ("Agenda for the coming week:" . "Agenda:")))
+
+  ;; To use all-the-icons package:
+  (setq dashboard-icon-type 'all-the-icons)  ; use `all-the-icons' package
+
+  ;; To use nerd-icons package:
+  (setq dashboard-display-icons-p t)     ; display icons on both GUI and terminal
+  (setq dashboard-icon-type 'nerd-icons) ; use `nerd-icons' package
+
+  ;; To add icons to the widget headings and their items:
+  (setq dashboard-set-heading-icons t)
+  (setq dashboard-set-file-icons t)
+
+  ;; ;; To modify heading icons with another icon from all-the-icons octicons:
+  ;; (dashboard-modify-heading-icons '((recents   . "file-text")
+  ;;                                 (bookmarks . "book")))
+
+  ;; To modify the icon height or vertical adjust:
+  (setq dashboard-icon-file-height 1.75)
+  (setq dashboard-icon-file-v-adjust -0.125)
+  (setq dashboard-heading-icon-height 1.75)
+  (setq dashboard-heading-icon-v-adjust -0.125)
+
+  ;; To use it with counsel-projectile or persp-projectile
+  (setq dashboard-projects-switch-function 'counsel-projectile-switch-project-by-name)
+
+  ;; To display today’s agenda items on the dashboard, add agenda to dashboard-items:
+  (add-to-list 'dashboard-items '(agenda) t)
+
+  ;; To show agenda for the upcoming seven days set the variable dashboard-week-agenda to t.
+  (setq dashboard-week-agenda t)
+
+  ;; By default org-agenda entries are filter by time, only showing those task with DEADLINE, SCHEDULE-TIME or TIMESTAMP . To show all agenda entries (except DONE)
+
+  (setq dashboard-filter-agenda-entry 'dashboard-no-filter-agenda)
+
+#+end_src
+
+*** Shortcuts
+
+| Shortcut                   | Function         |
+| Tab Or C-i                 | Next Item        |
+| Shift-Tab                  | Previous Item    |
+| Return / Mouse Click / C-m | Open             |
+| r                          | Recent files     |
+| m                          | Bookmarks        |
+| p                          | Projects         |
+| a                          | Org-Mode Agenda  |
+| e                          | Registers        |
+| g                          | Refresh contents |
+| {                          | Previous section |
+| }                          | Next section     |
+
+** Theme
+
+#+begin_src emacs-lisp
+  (use-package doom-themes
+    :ensure t
+    :config
+    ;; defaults
+    (setq doom-themes-enable-bold t
+  	doom-themes-enable-italic t)
+    (load-theme 'doom-material-dark t)
+
+    ;; flashing mode on error
+    (doom-themes-visual-bell-config)
+    ;; neotree theme
+    (doom-themes-neotree-config)
+    ;; org-mode
+    ;; (doom-themes-org-config)
+    )
+#+end_src
+
+** Doom Modeline
+
+Doom's Modeline is a worthy one.
+
+#+begin_src emacs-lisp
+
+  (use-package doom-modeline
+    :ensure t
+    :hook (after-init . doom-modeline-mode))
+
+  ;; If non-nil, cause imenu to see `doom-modeline' declarations.
+  ;; This is done by adjusting `lisp-imenu-generic-expression' to
+  ;; include support for finding `doom-modeline-def-*' forms.
+  ;; Must be set before loading doom-modeline.
+  (setq doom-modeline-support-imenu t)
+
+  ;; How tall the mode-line should be. It's only respected in GUI.
+  ;; If the actual char height is larger, it respects the actual height.
+  (setq doom-modeline-height 13)
+
+  ;; How wide the mode-line bar should be. It's only respected in GUI.
+  (setq doom-modeline-bar-width 4)
+
+  ;; Whether to use hud instead of default bar. It's only respected in GUI.
+  (setq doom-modeline-hud nil)
+
+  ;; The limit of the window width.
+  ;; If `window-width' is smaller than the limit, some information won't be
+  ;; displayed. It can be an integer or a float number. `nil' means no limit."
+  (setq doom-modeline-window-width-limit 85)
+
+  ;; Override attributes of the face used for padding.
+  ;; If the space character is very thin in the modeline, for example if a
+  ;; variable pitch font is used there, then segments may appear unusually close.
+  ;; To use the space character from the `fixed-pitch' font family instead, set
+  ;; this variable to `(list :family (face-attribute 'fixed-pitch :family))'.
+  (setq doom-modeline-spc-face-overrides nil)
+
+  ;; How to detect the project root.
+  ;; nil means to use `default-directory'.
+  ;; The project management packages have some issues on detecting project root.
+  ;; e.g. `projectile' doesn't handle symlink folders well, while `project' is unable
+  ;; to hanle sub-projects.
+  ;; You can specify one if you encounter the issue.
+  (setq doom-modeline-project-detection 'auto)
+
+  ;; Determines the style used by `doom-modeline-buffer-file-name'.
+  ;;
+  ;; Given ~/Projects/FOSS/emacs/lisp/comint.el
+  ;;   auto => emacs/l/comint.el (in a project) or comint.el
+  ;;   truncate-upto-project => ~/P/F/emacs/lisp/comint.el
+  ;;   truncate-from-project => ~/Projects/FOSS/emacs/l/comint.el
+  ;;   truncate-with-project => emacs/l/comint.el
+  ;;   truncate-except-project => ~/P/F/emacs/l/comint.el
+  ;;   truncate-upto-root => ~/P/F/e/lisp/comint.el
+  ;;   truncate-all => ~/P/F/e/l/comint.el
+  ;;   truncate-nil => ~/Projects/FOSS/emacs/lisp/comint.el
+  ;;   relative-from-project => emacs/lisp/comint.el
+  ;;   relative-to-project => lisp/comint.el
+  ;;   file-name => comint.el
+  ;;   file-name-with-project => FOSS|comint.el
+  ;;   buffer-name => comint.el<2> (uniquify buffer name)
+  ;;
+  ;; If you are experiencing the laggy issue, especially while editing remote files
+  ;; with tramp, please try `file-name' style.
+  ;; Please refer to https://github.com/bbatsov/projectile/issues/657.
+  (setq doom-modeline-buffer-file-name-style 'auto)
+
+  ;; Whether display icons in the mode-line.
+  ;; While using the server mode in GUI, should set the value explicitly.
+  (setq doom-modeline-icon t)
+
+  ;; Whether display the icon for `major-mode'. It respects option `doom-modeline-icon'.
+  (setq doom-modeline-major-mode-icon t)
+
+  ;; Whether display the colorful icon for `major-mode'.
+  ;; It respects `nerd-icons-color-icons'.
+  ;; (setq doom-modeline-major-mode-color-icon t)
+
+  ;; Whether display the icon for the buffer state. It respects option `doom-modeline-icon'.
+  (setq doom-modeline-buffer-state-icon t)
+
+  ;; Whether display the modification icon for the buffer.
+  ;; It respects option `doom-modeline-icon' and option `doom-modeline-buffer-state-icon'.
+  (setq doom-modeline-buffer-modification-icon t)
+
+  ;; Whether display the lsp icon. It respects option `doom-modeline-icon'.
+  (setq doom-modeline-lsp-icon t)
+
+  ;; Whether display the time icon. It respects option `doom-modeline-icon'.
+  (setq doom-modeline-time-icon t)
+
+  ;; Whether display the live icons of time.
+  ;; It respects option `doom-modeline-icon' and option `doom-modeline-time-icon'.
+  (setq doom-modeline-time-live-icon t)
+
+  ;; Whether to use an analogue clock svg as the live time icon.
+  ;; It respects options `doom-modeline-icon', `doom-modeline-time-icon', and `doom-modeline-time-live-icon'.
+  (setq doom-modeline-time-analogue-clock t)
+
+  ;; The scaling factor used when drawing the analogue clock.
+  (setq doom-modeline-time-clock-size 0.7)
+
+  ;; Whether to use unicode as a fallback (instead of ASCII) when not using icons.
+  (setq doom-modeline-unicode-fallback nil)
+
+  ;; Whether display the buffer name.
+  (setq doom-modeline-buffer-name t)
+
+  ;; Whether highlight the modified buffer name.
+  (setq doom-modeline-highlight-modified-buffer-name t)
+
+  ;; When non-nil, mode line displays column numbers zero-based.
+  ;; See `column-number-indicator-zero-based'.
+  (setq doom-modeline-column-zero-based t)
+
+  ;; Specification of \"percentage offset\" of window through buffer.
+  ;; See `mode-line-percent-position'.
+  (setq doom-modeline-percent-position '(-3 "%p"))
+
+  ;; Format used to display line numbers in the mode line.
+  ;; See `mode-line-position-line-format'.
+  (setq doom-modeline-position-line-format '("L%l"))
+
+  ;; Format used to display column numbers in the mode line.
+  ;; See `mode-line-position-column-format'.
+  (setq doom-modeline-position-column-format '("C%c"))
+
+  ;; Format used to display combined line/column numbers in the mode line. See `mode-line-position-column-line-format'.
+  (setq doom-modeline-position-column-line-format '("%l:%c"))
+
+  ;; Whether display the minor modes in the mode-line.
+  (setq doom-modeline-minor-modes nil)
+
+  ;; If non-nil, a word count will be added to the selection-info modeline segment.
+  (setq doom-modeline-enable-word-count nil)
+
+  ;; Major modes in which to display word count continuously.
+  ;; Also applies to any derived modes. Respects `doom-modeline-enable-word-count'.
+  ;; If it brings the sluggish issue, disable `doom-modeline-enable-word-count' or
+  ;; remove the modes from `doom-modeline-continuous-word-count-modes'.
+  (setq doom-modeline-continuous-word-count-modes '(markdown-mode gfm-mode org-mode))
+
+  ;; Whether display the buffer encoding.
+  (setq doom-modeline-buffer-encoding t)
+
+  ;; Whether display the indentation information.
+  (setq doom-modeline-indent-info nil)
+
+  ;; Whether display the total line number。
+  (setq doom-modeline-total-line-number nil)
+
+  ;; Whether display the icon of vcs segment. It respects option `doom-modeline-icon'."
+  (setq doom-modeline-vcs-icon t)
+
+  ;; The maximum displayed length of the branch name of version control.
+  (setq doom-modeline-vcs-max-length 15)
+
+  ;; The function to display the branch name.
+  (setq doom-modeline-vcs-display-function #'doom-modeline-vcs-name)
+
+  ;; Alist mapping VCS states to their corresponding faces.
+  ;; See `vc-state' for possible values of the state.
+  ;; For states not explicitly listed, the `doom-modeline-vcs-default' face is used.
+  (setq doom-modeline-vcs-state-faces-alist
+        '((needs-update . (doom-modeline-warning bold))
+          (removed . (doom-modeline-urgent bold))
+          (conflict . (doom-modeline-urgent bold))
+          (unregistered . (doom-modeline-urgent bold))))
+
+  ;; Whether display the icon of check segment. It respects option `doom-modeline-icon'.
+  (setq doom-modeline-check-icon t)
+
+  ;; If non-nil, only display one number for check information if applicable.
+  (setq doom-modeline-check-simple-format nil)
+
+  ;; The maximum number displayed for notifications.
+  (setq doom-modeline-number-limit 99)
+
+  ;; Whether display the project name. Non-nil to display in the mode-line.
+  (setq doom-modeline-project-name t)
+
+  ;; Whether display the workspace name. Non-nil to display in the mode-line.
+  (setq doom-modeline-workspace-name t)
+
+  ;; Whether display the perspective name. Non-nil to display in the mode-line.
+  (setq doom-modeline-persp-name t)
+
+  ;; If non nil the default perspective name is displayed in the mode-line.
+  (setq doom-modeline-display-default-persp-name nil)
+
+  ;; If non nil the perspective name is displayed alongside a folder icon.
+  (setq doom-modeline-persp-icon t)
+
+  ;; Whether display the `lsp' state. Non-nil to display in the mode-line.
+  (setq doom-modeline-lsp t)
+
+  ;; Whether display the GitHub notifications. It requires `ghub' package.
+  (setq doom-modeline-github nil)
+
+  ;; The interval of checking GitHub.
+  (setq doom-modeline-github-interval (* 30 60))
+
+  ;; Whether display the modal state.
+  ;; Including `evil', `overwrite', `god', `ryo' and `xah-fly-keys', etc.
+  (setq doom-modeline-modal t)
+
+  ;; Whether display the modal state icon.
+  ;; Including `evil', `overwrite', `god', `ryo' and `xah-fly-keys', etc.
+  (setq doom-modeline-modal-icon t)
+
+  ;; Whether display the modern icons for modals.
+  (setq doom-modeline-modal-modern-icon t)
+
+  ;; When non-nil, always show the register name when recording an evil macro.
+  (setq doom-modeline-always-show-macro-register nil)
+
+  ;; ;; Whether display the mu4e notifications. It requires `mu4e-alert' package.
+  ;; (setq doom-modeline-mu4e nil)
+  ;; ;; also enable the start of mu4e-alert
+  ;; (mu4e-alert-enable-mode-line-display)
+
+  ;; ;; Whet her display the gnus notifications.
+  (setq doom-modeline-gnus t)
+
+  ;; Whether gnus should automatically be updated and how often (set to 0 or smaller than 0 to disable)
+  (setq doom-modeline-gnus-timer 2)
+
+  ;; Wheter groups should be excludede when gnus automatically being updated.
+  (setq doom-modeline-gnus-excluded-groups '("dummy.group"))
+
+  ;; Whether display the IRC notifications. It requires `circe' or `erc' package.
+  (setq doom-modeline-irc t)
+
+  ;; Function to stylize the irc buffer names.
+  (setq doom-modeline-irc-stylize 'identity)
+
+  ;; Whether display the battery status. It respects `display-battery-mode'.
+  (setq doom-modeline-battery t)
+
+  ;; Whether display the time. It respects `display-time-mode'.
+  (setq doom-modeline-time t)
+
+  ;; Whether display the misc segment on all mode lines.
+  ;; If nil, display only if the mode line is active.
+  (setq doom-modeline-display-misc-in-all-mode-lines t)
+
+  ;; The function to handle `buffer-file-name'.
+  (setq doom-modeline-buffer-file-name-function #'identity)
+
+  ;; The function to handle `buffer-file-truename'.
+  (setq doom-modeline-buffer-file-truename-function #'identity)
+
+  ;; Whether display the environment version.
+  (setq doom-modeline-env-version t)
+  ;; Or for individual languages
+  (setq doom-modeline-env-enable-python t)
+  (setq doom-modeline-env-enable-ruby t)
+  (setq doom-modeline-env-enable-perl t)
+  (setq doom-modeline-env-enable-go t)
+  (setq doom-modeline-env-enable-elixir t)
+  (setq doom-modeline-env-enable-rust t)
+
+  ;; Change the executables to use for the language version string
+  (setq doom-modeline-env-python-executable "python") ; or `python-shell-interpreter'
+  (setq doom-modeline-env-ruby-executable "ruby")
+  (setq doom-modeline-env-perl-executable "perl")
+  (setq doom-modeline-env-go-executable "go")
+  (setq doom-modeline-env-elixir-executable "iex")
+  (setq doom-modeline-env-rust-executable "rustc")
+
+  ;; What to display as the version while a new one is being loaded
+  (setq doom-modeline-env-load-string "...")
+
+  ;; By default, almost all segments are displayed only in the active window. To
+  ;; display such segments in all windows, specify e.g.
+  (setq doom-modeline-always-visible-segments '(mu4e irc))
+
+  ;; Hooks that run before/after the modeline version string is updated
+  (setq doom-modeline-before-update-env-hook nil)
+  (setq doom-modeline-after-update-env-hook nil)
+
+#+end_src
+
+** Desktop Save
+
+Enable desktop-save mode, which saves the current buffer configuration on exit and reloads it on restart.
+
+Desktop mode also includes the =desktop-clear= function, which can be used to kill all open buffers. I bind it to ~Control-Meta-super-k~.
+
+#+begin_src emacs-lisp
+  (use-package desktop
+    :defer nil
+    :custom
+    (desktop-restore-eager   1 "Restore the first buffer right away")
+    (desktop-lazy-idle-delay 1 "Restore the other buffers 1 second later")
+    (desktop-lazy-verbose  nil "Be silent about lazily opening buffers")
+    :bind
+    ("C-M-s-k" . desktop-clear)
+    :config
+    (desktop-save-mode))
+#+end_src
+
+** Uniqueify
+
+The =uniquify= package makes it much easier to identify different open files with the same name by prepending/appending their directory or some other information to them. I configure it to add the directory name after the filename. =uniquify= is included with Emacs, so I specify =:ensure nil= so that =use-package= doesn't try to install it, and just loads and configures it.
+
+#+begin_src emacs-lisp
+  (use-package uniquify
+    :defer 1
+    :ensure nil
+    :custom
+    (uniquify-after-kill-buffer-p t)
+    (uniquify-buffer-name-style 'post-forward)
+    (uniquify-strip-common-suffix t))
+#+end_src
+
+** Highlight Line
+
+I like to highlight the current line. For this I use the built-in =hl-line=.
+
+#+begin_src emacs-lisp :noweb yes
+  (use-package hl-line
+    :disabled
+    :defer nil
+    :config
+    <<hl-line custom line-range function>>
+    (global-hl-line-mode))
+#+end_src
+
+I also provide a custom value for =hl-line-range-function= (thanks to Eric on the [[https://lists.gnu.org/archive/html/emacs-orgmode/2019-10/msg00303.html][org-mode mailing list]] for the tip) which highlights only the current visual line in =visual-line-mode=, which I use for Org-mode files (see [[*Beautifying org-mode][Beautifying org-mode]]).
+
+#+begin_src emacs-lisp :tangle no :noweb-ref hl-line custom line-range function
+  (defun zz/get-visual-line-range ()
+    (let (b e)
+      (save-excursion
+        (beginning-of-visual-line)
+        (setq b (point))
+        (end-of-visual-line)
+        (setq e (+ 1 (point)))
+        )
+      (cons b e)))
+  (setq hl-line-range-function #'zz/get-visual-line-range)
+#+end_src
+
+** Highlight Column
+
+I have also experimented with highlighting the current column. At the moment the code below is all disabled because I find it too distracting, but I'm leaving it  here for reference. I found two options to achieve this:
+
+- The =col-highlight= package, which highlights the column only after a defined interval has passed
+- The =crosshairs= package, which always highlights both the column and the line. It also has a "highlight crosshairs when idle" mode, but I prefer to have the current line always highlighted.
+
+#+begin_src emacs-lisp
+  (use-package col-highlight
+    :disabled
+    :defer nil
+    :config
+    (col-highlight-toggle-when-idle)
+    (col-highlight-set-interval 2))
+  (use-package crosshairs
+    :disabled
+    :defer nil
+    :config
+    (crosshairs-mode))
+#+end_src
+
+** Recentf
+
+I also use =recentf= to keep a list of recently open buffers. These are visible in helm's open-file mode.
+
+#+begin_src emacs-lisp
+  (use-package recentf
+    :defer 1
+    :custom
+    (recentf-max-menu-items 100)
+    (recentf-max-saved-items 100)
+    :init
+    (recentf-mode))
+#+end_src
+
+** IBuffer
+
+The [[http://martinowen.net/blog/2010/02/03/tips-for-emacs-ibuffer.html][ibuffer]] package allows all sort of useful operations on the list of open buffers. I haven't customized it yet, but I have a keybinding to open it. (Disabled for now as I am using helm's =helm-buffer-list=).
+
+#+begin_src emacs-lisp
+  (use-package ibuffer
+    :disabled
+    :bind
+    ("C-x C-b" . ibuffer))
+#+end_src
+
+** Smex
+
+The [[https://github.com/nonsequitur/smex][smex]] package is incredibly useful, adding IDO integration and some other very nice features to =M-x=, which make it easier to discover and use Emacs commands. Highly recommended. (Disabled for now as I'm using helm's =helm-M-x=).
+
+#+begin_src emacs-lisp
+  (use-package smex
+    :disabled
+    :bind (("M-x" . smex))
+    :config (smex-initialize))
+#+end_src
+
+** Midnight
+
+[[https://www.emacswiki.org/emacs/MidnightMode][midnight-mode]] purges buffers which haven't been displayed in 3 days. We configure the period so that the cleanup happens every 2 hours (7200 seconds).
+
+#+begin_src emacs-lisp
+  (use-package midnight
+    :defer 3
+    :config
+    (setq midnight-period 7200)
+    (midnight-mode 1))
+#+end_src
+
+** Distraction-Free
+
+For distraction-free writing, I'm testing out =writeroom-mode=.
+
+#+begin_src emacs-lisp
+  (use-package writeroom-mode
+    :ensure t)
+#+end_src
+
+** Neotree
+[[https://github.com/jaypei/emacs-neotree][NeoTree]] shows a navigation tree on a sidebar, and allows a number of operations on the files and directories. I'm not much of a fan of this type of interface in Emacs, but I have set it up to check it out.
+
+#+begin_src emacs-lisp
+  (use-package neotree
+    :custom
+    (neo-theme (if (display-graphic-p) 'icons 'arrow))
+    (neo-smart-open t)
+    (projectile-switch-project-action 'neotree-projectile-action)
+    :config
+    (defun neotree-project-dir ()
+      "Open NeoTree using the git root."
+      (interactive)
+      (let ((project-dir (projectile-project-root))
+            (file-name (buffer-file-name)))
+        (neotree-toggle)
+        (if project-dir
+            (if (neo-global--window-exists-p)
+                (progn
+                  (neotree-dir project-dir)
+                  (neotree-find file-name)))
+          (message "Could not find git project root."))))
+    :bind
+    ([f8] . neotree-project-dir))
+#+end_src
+
+** Word Count
+=wc-mode= allows counting characters and words, both on demand and continuously. It also allows setting up a word/character goal.
+
+#+begin_src emacs-lisp
+  (use-package wc-mode
+    :defer 3
+    :hook
+    (org-journal-mode . wc-mode))
+#+end_src
+
+** All The Icons
+
+The =all-the-icons= package provides a number of useful icons.
+
+#+begin_src emacs-lisp
+  (use-package all-the-icons
+    :defer 3)
+#+end_src
+
+** Completion: IDO or Helm?
+
+The [[https://tuhdo.github.io/helm-intro.html][battle]] [[https://news.ycombinator.com/item?id=11100312][rages]] [[https://www.reddit.com/r/emacs/comments/3o36sc/what_do_you_prefer_ido_or_helm/][on]] - [[https://github.com/emacs-helm/helm][helm]] or [[https://www.emacswiki.org/emacs/InteractivelyDoThings][IDO]]? Both are nice completion frameworks for Emacs, and both integrate nicely with most main Emacs functions, including file opening, command and buffer selection, etc. I was using IDO for some time but are now giving helm a try. Both my configs are shown below, but only Helm is enabled at the moment.
+
+Should I also look at [[https://sam217pa.github.io/2016/09/13/from-helm-to-ivy/][ivy]]?
+
+*** IDO
+
+I use [[https://www.masteringemacs.org/article/introduction-to-ido-mode][IDO mode]] to get better matching capabilities everywhere in Emacs (disabled while I give helm a try, see below).
+
+#+begin_src emacs-lisp
+(use-package ido
+  :disabled
+  :config
+  (ido-mode t)
+  (ido-everywhere 1)
+  (setq ido-use-virtual-buffers t)
+  (setq ido-enable-flex-matching t)
+  (setq ido-use-filename-at-point nil)
+  (setq ido-auto-merge-work-directories-length -1))
+
+(use-package ido-completing-read+
+  :disabled
+  :config
+  (ido-ubiquitous-mode 1))
+#+end_src
+
+*** Helm
+
+This config came originally from [[https://github.com/daedreth/UncleDavesEmacs#user-content-ido-and-why-i-started-using-helm][Uncle Dave's Emacs config]], though I have tweaked it a bit.
+
+#+begin_src emacs-lisp
+  (use-package helm
+    :ensure t
+    :defer 1
+    :diminish helm-mode
+    :bind
+    (("C-x C-f"       . helm-find-files)
+     ("C-x C-b"       . helm-buffers-list)
+     ("C-x b"         . helm-multi-files)
+     ("M-x"           . helm-M-x)
+     :map helm-find-files-map
+     ("C-<backspace>" . helm-find-files-up-one-level)
+     ("C-f"           . helm-execute-persistent-action)
+     ([tab]           . helm-ff-RET))
+    :init
+    (defun daedreth/helm-hide-minibuffer ()
+      (when (with-helm-buffer helm-echo-input-in-header-line)
+        (let ((ov (make-overlay (point-min) (point-max) nil nil t)))
+          (overlay-put ov 'window (selected-window))
+          (overlay-put ov 'face
+                       (let ((bg-color (face-background 'default nil)))
+                         `(:background ,bg-color :foreground ,bg-color)))
+          (setq-local cursor-type nil))))
+    :custom
+    (helm-autoresize-max-height 0)
+    (helm-autoresize-min-height 40)
+    (helm-buffers-fuzzy-matching t)
+    (helm-recentf-fuzzy-match t)
+    (helm-semantic-fuzzy-match t)
+    (helm-imenu-fuzzy-match t)
+    (helm-split-window-in-side-p nil)
+    (helm-move-to-line-cycle-in-source nil)
+    (helm-ff-search-library-in-sexp t)
+    (helm-scroll-amount 8)
+    (helm-echo-input-in-header-line nil)
+    :config
+    ;;(require 'helm-config)
+    (helm-mode 1)
+    (helm-autoresize-mode 1)
+    :hook
+    (helm-mode .
+               (lambda ()
+                 (setq completion-styles
+                       (cond ((assq 'helm-flex completion-styles-alist)
+                              '(helm-flex)) ;; emacs-26
+                             ((assq 'flex completion-styles-alist)
+                              '(flex))))))  ;; emacs-27+
+    (helm-minibuffer-set-up . daedreth/helm-hide-minibuffer))
+
+  (use-package helm-flx
+    :ensure t
+    :custom
+    (helm-flx-for-helm-find-files t)
+    (helm-flx-for-helm-locate t)
+    :config
+    (helm-flx-mode +1))
+
+  (use-package swiper-helm
+    :ensure t
+    :bind
+    ("C-s" . swiper))
+#+end_src
+
+** Dired
+
+#+begin_src emacs-lisp
+  (use-package dired
+    :ensure nil
+    :commands (dired dired-jump)
+    :bind (("C-c C-j" . direc-jump)))
+
+  (use-package all-the-icons-dired
+    :hook (dired-mode . all-the-icons-dired-mode))
+
+  (use-package dired-open
+    :ensure t
+    :config
+    (setq dired-open-extensions '(("png" . "loupe")
+                                   ("mkv" . "vlc")
+                                   ("mp4" . "vlc"))))
+
+  (use-package dired-hide-dotfiles
+    :hook (dired-mode . dired-hide-dotfiles-mode)
+    :config
+    (define-key dired-mode-map "H" dired-hide-dotfiles-mode))
+
+#+end_src
+
+* Programming
+
+** General settings and modules
+
+*** Subword
+When enabled, =subword= allows navigating "sub words" individually in CamelCaseIdentifiers. For now I only enable it in =clojure-mode=.
+
+#+begin_src emacs-lisp
+  (use-package subword
+    :hook
+    (prog-mode . subword-mode))
+#+end_src
+
+*** Aggressive Indent
+
+With =aggressive-indent=, indentation is always kept up to date in the whole buffer. Sometimes it gets in the way, but in general it's nice and saves a lot of work, so I enable it for all programming modes except for Python mode, where I explicitly disable as it often gets the indentation wrong and messes up existing code.
+
+#+begin_src emacs-lisp
+  (use-package aggressive-indent
+    :ensure t
+    :disabled
+    :diminish aggressive-indent-mode
+    :hook
+    (prog-mode . aggressive-indent-mode)
+    (python-mode . (lambda () (aggressive-indent-mode -1))))
+#+end_src
+
+*** Projectile
+
+=projectile-mode= allows us to perform project-relative operations such as searches, navigation, etc.
+
+#+begin_src emacs-lisp
+  (use-package projectile
+    :defer 2
+    :diminish projectile-mode
+    :config
+    (projectile-global-mode)
+    :bind-keymap
+    ("C-c p" . projectile-command-map)
+    :init
+    (when (file-directory-p "~/Music")
+    	(setq projectile-project-search-path `("~/Music")))
+    (setq projectile-switch-project-action #'projectile-dired))
+
+
+  ;;; find the root of the project
+  (defun projectile-project-find-function (dir)
+    (let* ((root (projectile-project-root dir)))
+      (and root (cons 'transient root))))
+
+  (with-eval-after-load 'project
+    (add-to-list 'project-find-functions 'projectile-project-find-function))
+
+  (use-package counsel-projectile
+    :ensure t
+    :config (counsel-projectile-mode))
+
+#+end_src
+
+*** Iedit
+
+I find =iedit= absolutely indispensable when coding. In short: when you hit =Ctrl-:=, all occurrences of the symbol under the cursor (or the current selection) are highlighted, and any changes you make on one of them will be automatically applied to all others. It's great for renaming variables in code, but it needs to be used with care, as it has no idea of semantics, it's  a plain string replacement, so it can inadvertently modify unintended parts of the code.
+
+#+begin_src emacs-lisp
+  (use-package iedit
+    :config
+    (set-face-background 'iedit-occurrence "Magenta")
+    :bind
+    ("C-;" . iedit-mode))
+#+end_src
+
+*** Online Documentation
+
+Turn on the online documentation mode for all programming modes (not all of them support it) and for the Clojure REPL =cider= mode.
+
+#+begin_src emacs-lisp
+  (use-package eldoc
+    :diminish
+    :hook
+    (prog-mode       . turn-on-eldoc-mode)
+    (cider-repl-mode . turn-on-eldoc-mode)
+  	(slime-mode      . turn-on-eldoc-mode))
+#+end_src
+
+*** Flyspell
+
+On-the-fly spell checking. I enable it for all text modes.
+
+#+begin_src emacs-lisp
+  (use-package flyspell
+    :defer 1
+    :diminish)
+#+end_src
+
+** Debugging
+
+The most important part of developing and testing a software.
+
+*** Realgud
+#+begin_src emacs-lisp
+  (use-package realgud
+    :ensure t)
+#+end_src
+
+**** Quickstart
+Type ==M-x load-library RET realgud RET== to load RealGUD.
+
+**** Launching a debugger
+Open a source file, then use M-x realgud:<debugger-name> to start your favorite debugger (for example, you can use M-x realgud:pdb to launch PDB, a Python debugger). RealGUD opens two windows: the command window (showing the debugger's REPL), and the source window, showing your code (with some debuggers, such as realgud:gdb, this window does not appear until you type start in the command window). An solid arrow ▶ indicates the current line in the source window. Grayed out arrows indicate previous positions.
+
+**** Using the debugger
+All usual debugger commands work in the command window: for example, you can type n RET in the command window to step forward one source line. But RealGUD's power lies in the source window: in it, most single keys correspond to a debugger action. For example, you can press n in the source window to step forward.
+
+**** Source window commands
+Here is a quick rundown of the most useful commands. “🐁” indicates mouse commands (commands that can be run by clicking on a variable or in the margins). Many of the commands are accessible from the tool bar (tool-bar-mode) and the menu (menu-bar-mode).
+
+***** Motion commands
+| Command     | Action                                 |
+|-------------+----------------------------------------|
+| n, F10      | Next (aka “step over”, “step through”) |
+| s, SPC, F11 | Step (aka “step into”)                 |
+| f, S-F11    | Finish (aka “step out”, “return”)      |
+| c, F5       | Continue (run to next break point)     |
+
+***** Using breakpoints
+| Command | Action                          |
+|---------+---------------------------------|
+| b, F9   | Set breakpoint 🐁               |
+| D       | Clear breakpoint 🐁 (by number) |
+
+***** Inspecting variables
+| Command                 | Action                                        |
+|-------------------------+-----------------------------------------------|
+| mouse-2 (middle button) | Inspect variable under cursor (in tooltip) 🐁 |
+| e                       | Evaluate expression                           |
+
+***** Control commands
+| Command | Action               |
+|---------+----------------------|
+| q, S-F5 | Quit                 |
+| R, r    | Run (aka “restart”)  |
+| S       | Go to command window |
+
+
+**** Supported debuggers
+
+RealGUD supports many [[https://github.com/realgud/realgud/wiki/Debuggers-Available][external debuggers]]. Help us support even more!
+
+**** Advanced topics
+***** Extra commands
+
+“⚙” indicates a work-in-progress (contributions welcome!)
+| Command | Action                                   |
+|---------+------------------------------------------|
+| U       | Until (run to a greater source line)     |
+| u, >    | Up stack (move to older stack frame)     |
+| d, <    | Down stack (move to younger stack frame) |
+| X       | Clear breakpoint (by line)               |
+| j       | Jump to current line ⚙                   |
+| -       | Disable breakpoint ⚙                     |
+| +       | Enable breakpoint ⚙                      |
+Tracking an existing debugger process
+
+Use M-x realgud-track-mode inside an existing shell, or eshell buffer to track an already-running debugger process.
+RealGUD's wiki
+Browse the wiki for more information about setting up, using realgud, exploring features, and lots more.
+
+** Language Servers
+
+#+begin_src emacs-lisp
+
+  (use-package flycheck-eglot
+  :ensure t
+  :after (flycheck eglot)
+  :custom (flycheck-eglot-exclusive nil)
+  :config
+  (global-flycheck-eglot-mode 1))
+
+  (use-package eglot
+    :hook (((go-mode. eglot-ensure)
+  	         (cc-mode . eglot-ensure)
+             (python-mode . eglot-ensure)
+  	         (java-mode . eglot-ensure)
+  	         (lua-mode . eglot-ensure)
+  	         (zig-mode . eglot-ensure)
+  	         (json-mode . eglot-ensure)
+  	         (markdown-mode . eglot-ensure)
+  	         (sh-mode . eglot-ensure)
+  	         (powershell-mode . eglot-ensure)
+  	         (clojure-mode . eglot-ensure)
+
+  					 (python-mode . eglot-mode)
+  					 (c-mode . eglot-mode)
+  					 (go-mode . eglot-mode)))
+    :bind (:map eglot-mode-map
+  	        ("M-."   . xref-find-definitions)
+  	        ("M-?"   . xref-find-references)
+  	        ("C-c f" . eglot-format-buffer)
+  	        ("C-c r" . eglot-rename)
+  	        ("C-c a" . eglot-code-actions)
+  	        ("C-c h" . eglot-hover)
+  	        ("C-c C-x f" . eglot-find-references)
+  	        ("C-c s" . eglot-workspace-symbol)
+  	        ("C-c n" . flycheck-goto-next-error)
+  	        ("C-c p" . flycheck-goto-prev-error))
+    :config
+    (setq eldoc-documentation-strategy
+  	  #'eldoc-documentation-compose-eagerly) ; signature help
+
+    (setq eldoc-echo-area-use-multiline-p nil) ; single line eldoc
+    (setq eldoc-idle-delay 0.1)
+
+    ;; don't allow servers to format the buffer
+    (setq eglot-ignored-server-capabilities '(:documentFormattingProvider :documentRangeFormattingProvider))
+    ;; inlay hints
+    (when (boundp 'eglot-extend-to-xref)
+      (setq eglot-extend-to-xref t))
+
+    ;;inlay hints at startup
+    (add-hook 'eglot-managed-mode-hook
+  	  (lambda ()
+  	    (when (eglot-server-capable :inlayHintProvider)
+  		    (eglot-inlay-hints-mode 1))))
+
+    (setq completion-auto-help nil)
+    (setq completion-show-inline-help nil))
+
+  (with-eval-after-load 'eglot
+    (setq eglot-server-programs
+      '((c-mode . ("clangd"))
+         (c++-mode . ("clangd"))
+         (go-mode . ("gopls"))
+         (python-mode . ("pyright-langserver" "--stdio"))
+         (java-mode . ("jdtls"))
+         (lua-mode . ("lua-language-server"))
+         (zig-mode . ("zls"))
+         (json-mode . ("vscode-json-languageserver" "--stdio"))
+         (markdown-mode . ("marksman"))
+         (sh-mode . ("bash-language-server" "start"))
+         (powershell-mode . ("powershell-editor-services" "--stdio"))
+         (clojure-mode . ("clojure-lsp")))))
+
+#+end_src
+
+** Assembly
+
+#+begin_src emacs-lisp
+  (use-package asm-mode
+    :mode ("\\.asm\\'" "\\.s\\'" "\\.S\\'"))
+
+  (add-hook 'asm-mode-hook
+    (lambda ()
+              (setq tab-width 8 ;; or whatever asm wants
+                    indent-tabs-mode t)))
+
+#+end_src
+
+** C
+
+#+begin_src emacs-lisp
+  (use-package cc-mode
+    :ensure t
+    :config
+    (setq c-default-style "k&r"
+  	c-basic-offset 4))
+#+end_src
+
+** C++
+
+#+begin_src emacs-lisp
+  (use-package c++-mode
+    :ensure nil
+    :mode ("\\.cpp\\'" "\\.hpp\\'" "\\.cc\\'" "\\.hh\\'"))
+
+  (add-hook 'makefile-mode-hook
+            (lambda ()
+              (setq indent-tabs-mode t)))
+#+end_src
+
+** Go
+
+#+begin_src emacs-lisp
+
+  (use-package go-mode
+    :ensure t
+    :mode ("\\.go\\'" "\\.mod\\'")
+    :hook ((before-save . gofmt-before-save)))
+
+  ;; (set-indent 'go-mode 4 t) ;; Go prefers tabs
+
+  (setq gofmt-command "goimports")
+
+#+end_src
+
+
+** Python
+
+
+#+begin_src emacs-lisp
+    (use-package python
+    :ensure nil
+  	:custom
+  	(python-shell-interpreter "python3"))
+
+  (use-package elpy
+    :ensure t
+  	:config
+    (require 'elpy-config)
+    :hook
+  	(python-mode . elpy-mode))
+
+  (use-package pyvenv
+    :ensure t
+    :config
+    (pyvenv-mode 1))
+
+  ;; (set-indent 'python-mode 4 0)
+
+  ;;;; Function Signature and auto-import
+  (use-package jedi
+    :hook (python-mode . jedi:setup))
+
+#+end_src
+
+** Java
+
+#+begin_src emacs-lisp
+  (use-package java-mode
+  :ensure nil
+  :mode "\\.java\\'")
+
+#+end_src
+
+** Lua
+
+#+begin_src emacs-lisp
+  (use-package lua-mode
+    :ensure t
+    :mode "\\.lua\\'")
+
+  ;; (set-indent 'lua-mode 4 0)
+
+#+end_src
+
+** Zig
+
+#+begin_src emacs-lisp
+  (use-package zig-mode
+    :ensure t
+    :mode "\\.zig\\'")
+
+  ;; (set-indent 'zig-mode 4 0)
+
+#+end_src
+
+**  JSON
+
+#+begin_src emacs-lisp
+
+  (use-package json-mode
+    :ensure t
+    :mode "\\.json\\'")
+
+  ;; (set-indent 'json-mode 2 t)
+
+#+end_src
+
+** [[https://daringfireball.net/projects/markdown/syntax][Markdown]]
+
+#+begin_src emacs-lisp
+  (use-package markdown-mode
+    :ensure t
+    :mode "\\.md\\'"
+    :hook
+  	(markdown-mode . visual-line-mode)
+  	(markdown-mode . variable-pitch-mode))
+
+  ;; (set-indent 'markdown-mode 2 0)
+
+#+end_src
+
+**  Shell
+
+#+begin_src emacs-lisp
+  (use-package sh-script
+    :ensure nil
+    :mode ("\\.sh\\'" . sh-mode))
+
+  ;; (set-indent 'sh-mode 2 0)
+
+#+end_src
+
+**  Powershell
+
+#+begin_src emacs-lisp
+  (use-package powershell
+    :ensure t
+    :mode ("\\.ps1\\'" . powershell-mode))
+
+  ;; (set-indent 'powershell-mode 4 0)
+
+#+end_src
+
+** Julia
+
+#+begin_src emacs-lisp
+
+  (use-package julia-mode
+  	:mode ("\\.jl\\'" . julia-mode)
+  	:config
+  	(define-key julia-mode-map (kbd "TAB") 'julia-latexsub-or-indent))
+
+  (use-package julia-snail
+    :ensure t
+    :hook
+    (julia-mode . julia-snail-mode))
+
+  (add-to-list 'display-buffer-alist
+               '("\\*julia" (display-buffer-reuse-window display-buffer-same-window)))
+
+#+end_src
+
+*** Customizations
+
+- julia-snail-use-emoji-mode-lighter (default t) — attempt to use a 🐌 emoji in the Emacs modeline lighter if the display supports it. Set to nil to use the ASCII string "Snail" instead (a :diminish override in use-package should also work).
+
+- julia-snail-repl-display-eval-results (default nil) — print the result of evaluating code sent from Emacs to the REPL.
+
+- julia-snail-popup-display-eval-results (default :command) — show the result of evaluating code sent from Emacs to the REPL in the source buffer. Set to nil to deactivate, to :command to have the popup disappear at the next command, or to :change for when the buffer contents change. When set to :change, the popup display is limited to a single line.
+
+- julia-snail-imenu-style (default :module-tree) — control Imenu integration, especially module detection handling. When set to :module-tree, the Imenu is a tree with modules as nodes and functions, macros, and types as the leaves. This works well with modern Imenu display commands like consult-imenu and helm-imenu, and allows the imenu-list package to show a nice tree. However, this may interfere with the simpler imenu Emacs built-in command as it forces hierarchical navigation to reach leaves. The :flat setting disables Imenu hierarchies and instead puts the full module path in the identifier. To disable Snail's Imenu integration completely and fall back to the julia-mode regexp-based default, set julia-snail-imenu-style to nil.
+
+*** Usage
+
+The following describes basic Snail functionality. Refer to the Snail project wiki for additional information, including a Tips and Tricks section.
+Basics
+
+Once Snail is properly installed, open a Julia source file. If julia-mode-hook has been correctly configured, julia-snail-mode should be enabled in the buffer (look for the Snail lighter in the modeline).
+
+Start a Julia REPL using M-x julia-snail or C-c C-z. This will load all the Julia-side supporting code Snail requires, and start a server. The server runs on a TCP port (10011 by default) on localhost. You will see JuliaSnail.start(<port>) execute on the REPL.
+
+NB: If the REPL does not start successfully, this means the julia binary invocation failed. A common reason for this is failure to find the julia binary. Check that julia-snail-executable is on your Emacs exec-path or set to an absolute path. It may be useful to do this in a .dir-locals.el so it can be set per-project. It may also happen that Snail bootstrapping fails, in which case the error buffer may flash too quickly to see. To debug this problem, switch to the command line and run /path/to/julia -L /path/to/julia-snail/JuliaSnail.jl, which should show the error.
+
+If the REPL buffer is set to use libvterm mode (the default), then libvterm configuration and key bindings will affect it. If the REPL buffer is set to use Eat, then Eat configuration and key bindings will also take effect.
+
+If the Julia program uses Pkg, then run M-x julia-snail-package-activate or C-c C-a to enable it. (Doing this using REPL commands like ] also works as normal.)
+
+Load the current Julia source file using M-x julia-snail-send-buffer-file or C-c C-k. Notice that the REPL does not show an include() call, because the command executed across the Snail network connection. Among other advantages, this minimizes REPL history clutter.
+
+Users of Revise should load it normally into the session, and do not need to use julia-snail-send-buffer-file.
+
+Once some Julia code has been loaded into the running image, Snail can begin introspecting it for purposes of cross-references and identifier completion.
+
+The julia-snail-mode minor mode provides a key binding map (julia-snail-mode-map) with the following commands:
+
+
+
+| key     | command and description                                                                                                                                      |
+| C-c C-z | julia-snail: start a REPL; flip between REPL and source                                                                                                      |
+| C-c C-a | julia-snail-package-activate: activate the project using Project.toml                                                                                        |
+| C-c C-d | julia-snail-doc-lookup: display the docstring of the identifier at point                                                                                     |
+| C-c C-l | julia-snail-send-line: evaluate current line in the current module (or in Main with prefix arg; or copy directly to REPL with two prefix args)               |
+| C-c C-r | julia-snail-send-region: evaluate active region in the current module (or in Main with prefix arg;or copy directly to REPL with two prefix args)             |
+| C-c C-e | julia-snail-send-dwim: if region active, evaluate it in current module;else if on top-level block, evaluate it in current module; else evaluate current line |
+| C-c C-c | julia-snail-send-top-level-form: evaluate end-terminated block around the point in the current module                                                        |
+| C-M-x   | julia-snail-send-top-level-form: ditto                                                                                                                       |
+| C-c C-k | julia-snail-send-buffer-file: include() the current buffer’s file                                                                                            |
+| C-c C-R | julia-snail-update-module-cache: update module-nested include cache (mainly for Revise)                                                                      |
+
+
+For more info [[Snail][juila snail github page]]
+
+** Lisp
+
+#+begin_src emacs-lisp
+  (defun lisp-common-setup ()
+    (electric-pair-mode -1)
+    (whitespace-mode -1)
+    (setq tab-width 2
+          lisp-indent-offset 2
+          indent-tabs-mode 0))
+
+  ;;;; Disable electric-indent mode for Lisp
+  (dolist (hook '( org-mode
+  		 clojure-mode
+  		 emacs-lisp-mode
+  		 lisp-mode
+  		 cider-repl-mode
+  		 racket-mode
+  		 racket-repl-mode
+  		 slime-mode
+                   lisp-interaction-mode
+                   scheme-mode
+  		 slime-repl-mode))
+    (add-hook hook #'lisp-common-setup))
+
+#+end_src
+
+
+*** Common Lisp
+
+#+begin_src emacs-lisp
+
+  (use-package slime
+    :ensure t
+    :init
+    :config
+    (slime-setup '(slime-fancy slime-repl slime-banner))
+    (setq slime-complete-symbol*-fancy t))
+
+  (with-eval-after-load "slime"
+    ;; a list of alternative Common Lisp implementations that can be
+    ;; used with SLIME. Note that their presence render
+    ;; inferior-lisp-program useless. This variable holds a list of
+    ;; programs and if you invoke SLIME with a negative prefix
+    ;; argument, M-- M-x slime, you can select a program from that list.
+    (setq slime-lisp-implementations
+          '((ccl ("ccl"))
+            (clisp ("clisp" "-q"))
+            (cmucl ("cmucl" "-quiet"))
+            (sbcl ("sbcl" "--noinform") :coding-system utf-8-unix)))
+
+    ;; load slime helper from the quicklisp library manager for Common Lisp
+    (load (expand-file-name "~/quicklisp/slime-helper.el"))
+
+    ;; select the default value from slime-lisp-implementations
+    (if (and (eq system-type 'darwin)
+             (executable-find "ccl"))
+        ;; default to Clozure CL on macOS
+        (setq slime-default-lisp 'ccl)
+      ;; default to SBCL on Linux and Windows
+      (setq slime-default-lisp 'sbcl))
+
+    ;; Add fancy slime contribs
+    (setq slime-contribs '(slime-fancy slime-cl-indent))
+
+    (setq slime-complete-symbol-function 'slime-fuzzy-complete-symbol
+          slime-fuzzy-completion-in-place t
+          slime-enable-evaluate-in-emacs t
+          slime-autodoc-use-multiline-p t)
+
+    (define-key slime-mode-map (kbd "C-c C-s") 'slime-selector))
+
+
+  (defun my/common-lisp-setup ()
+    (slime-mode +1))
+
+  (add-hook 'lisp-mode-hook #'my/common-lisp-setup)
+
+#+end_src
+
+** [[https://racket-lang.org/][Racket]]
+
+  #+begin_src emacs-lisp
+  (use-package racket-mode
+    :ensure t
+  )
+  #+end_src
+
+** Clojure
+
+The centerpiece is of course =clojure-mode=. In addition to files ending in =.clj=, I bind it automatically to =.boot= files (both by extension and by [[https://github.com/boot-clj/boot/wiki/For-Emacs-Users][shebang line]]) and to the [[http://riemann.io/][Riemann]] config files.
+
+#+begin_src emacs-lisp
+  (use-package clojure-mode
+    :mode "\\.clj.*$"
+    :mode "riemann.config"
+    :mode "\\.boot"
+    :config
+    (add-to-list 'magic-mode-alist '(".* boot" . clojure-mode)))
+#+end_src
+
+Enable some additional fontification for Clojure code.
+
+#+begin_src emacs-lisp
+  ;; (use-package clojure-mode-extra-font-locking
+  ;;   :ensure t)
+#+end_src
+
+The =cider= package provides a fantastic REPL built into Emacs. We configure a few aspects, including pretty printing, fontification, history size and others.
+
+#+begin_src emacs-lisp
+  ;; (use-package cider
+  ;;     :ensure t
+  ;;     :custom
+  ;;     ;; nice pretty printing
+  ;;     (cider-repl-use-pretty-printing nil)
+  ;;     ;; nicer font lock in REPL
+  ;;     (cider-repl-use-clojure-font-lock t)
+  ;;     ;; result prefix for the REPL
+  ;;     (cider-repl-result-prefix "; => ")
+  ;;     ;; never ending REPL history
+  ;;     (cider-repl-wrap-history t)
+  ;;     ;; looong history
+  ;;     (cider-repl-history-size 5000)
+  ;;     ;; persistent history
+  ;;     (cider-repl-history-file "~/.emacs.d/cider-history")
+  ;;     ;; error buffer not popping up
+  ;;     (cider-show-error-buffer nil)
+  ;;     ;; go right to the REPL buffer when it's finished connecting
+  ;;     (cider-repl-pop-to-buffer-on-connect t))
+#+end_src
+
+We use =clj-refactor= for supporting advanced code refactoring in Clojure.
+
+#+begin_src emacs-lisp
+  (use-package clj-refactor
+    :ensure t
+    :config
+    (defun my-clojure-mode-hook ()
+      (clj-refactor-mode 1)
+      (yas-minor-mode 1) ; for adding require/use/import statements
+      ;; This choice of keybinding leaves cider-macroexpand-1 unbound
+      (cljr-add-keybindings-with-prefix "C-c C-m"))
+    :hook
+    (clojure-mode . my-clojure-mode-hook))
+#+end_src
+
+Use =emr= for supporting refactoring in Emacs LISP and some other languages.
+
+#+begin_src emacs-lisp
+  (use-package emr
+    :ensure t
+    :config
+    (bind-key "A-RET" 'emr-show-refactor-menu prog-mode-map))
+#+end_src
+
+When coding in LISP-like languages, =rainbow-delimiters= is a must-have - it marks each concentric pair of parenthesis with different colors, which makes it much easier to understand expressions and spot mistakes.
+
+#+begin_src emacs-lisp
+  (use-package rainbow-delimiters
+    :ensure t
+    :hook
+    ((prog-mode cider-repl-mode slime-mode org-mode) . rainbow-delimiters-mode))
+#+end_src
+
+Another useful addition for LISP coding - =smartparens= enforces parenthesis to match, and adds a number of useful operations for manipulating parenthesized expressions. I map =M-(= to enclose the next expression as in =paredit= using a custom function. Prefix argument can be used to indicate how many expressions to enclose instead of just 1. E.g. =C-u 3 M-(= will enclose the next 3 sexps.
+
+#+begin_src emacs-lisp
+  (defun zz/sp-enclose-next-sexp (num)
+    (interactive "p")
+    (insert-parentheses (or num 1)))
+
+  (use-package smartparens
+    :ensure t
+    :diminish smartparens-mode
+    :config
+    (require 'smartparens-config)
+    :custom
+    (sp-base-key-bindings 'paredit)
+    :hook
+    ((org-mode
+      clojure-mode
+      emacs-lisp-mode
+      lisp-mode
+      cider-repl-mode
+      racket-mode
+      racket-repl-mode
+  			slime-mode) . smartparens-strict-mode)
+    (smartparens-mode  . sp-use-paredit-bindings)
+    (smartparens-mode  . (lambda ()
+                           (local-set-key (kbd "M-(")
+                                          'zz/sp-enclose-next-sexp))))
+#+end_src
+
+Minor mode for highlighting the current sexp in LISP modes.
+
+#+begin_src emacs-lisp
+  (defgroup highlight-sexp nil
+  "Highlight sexp"
+  :group 'faces
+  :group 'matching)
+
+(defvar hl-sexp-overlay
+  nil
+  "The current overlay.")
+
+(defcustom hl-sexp-background-color
+  "#4b3b4b"
+  "*The color used for the background of the highlighted sexp."
+  :type 'color
+  :group 'highlight-sexp)
+
+(defcustom hl-sexp-foreground-color
+  nil
+  "*The color used for the foreground of the highlighted sexp"
+  :type 'color
+  :group 'highlight-sexp)
+
+(make-face 'hl-sexp-face)
+(defcustom hl-sexp-face
+  nil
+  "*The face used for the highlighted sexp."
+  :group 'highlight-sexp)
+
+;;;###autoload
+(define-minor-mode highlight-sexp-mode
+  "Minor mode to highlight the current zone according to its
+    context, i.e. sexp, comment, string."
+  nil
+  " hl-sexp"
+  nil
+  (if highlight-sexp-mode
+      (progn
+        (hl-sexp-create-overlay)
+        (add-hook 'post-command-hook 'hl-sexp-highlight nil t)
+        (add-hook 'clone-indirect-buffer-hook 'hl-sexp-handle-clone-indirect-buffer nil t))
+    (hl-sexp-delete-overlay)
+    (kill-local-variable 'hl-sexp-overlay)
+    (remove-hook 'post-command-hook 'hl-sexp-highlight t)
+    (remove-hook 'clone-indirect-buffer-hook 'hl-sexp-handle-clone-indirect-buffer t))
+  )
+
+;;;###autoload
+(define-globalized-minor-mode global-highlight-sexp-mode
+  highlight-sexp-mode
+  (lambda ()
+    (highlight-sexp-mode t)))
+
+(defun hl-sexp-delete-overlay ()
+  (if hl-sexp-overlay
+      (delete-overlay hl-sexp-overlay))
+  (setq hl-sexp-overlay nil))
+
+(defun hl-sexp-highlight ()
+  (let ((text-property (get-text-property (point) 'face)))
+    ;; HACKY HACK: just in case, this avoid to go further.
+    (cond ((or (eq text-property 'font-lock-string-face)
+               (eq text-property 'font-lock-comment-face)
+               (eq text-property 'font-lock-doc-face))
+           (move-overlay hl-sexp-overlay 0 0))
+          (t
+           (save-excursion
+             (ignore-errors
+               (let* ((sppss (syntax-ppss))
+                      (start (elt sppss 1))
+                      (inside-a-string? (elt sppss 3))
+                      (inside-a-comment? (elt sppss 4))
+                      end)
+                 ;; 'font-lock-****-face isn't really to be trusted
+                 (cond ((and start
+                             (not inside-a-string?)
+                             (not inside-a-comment?))
+                        (ignore-errors
+                          (setq end (scan-sexps start 1)))
+                        (cond (end
+                               (move-overlay hl-sexp-overlay (1+ start) (1- end)))
+                              (t
+                               (move-overlay hl-sexp-overlay (1+ start) (point)))))
+                       (t (move-overlay hl-sexp-overlay 0 0))))))))))
+
+(defun hl-sexp-create-overlay ()
+  (let ((attribute (face-attr-construct 'hl-sexp-face)))
+    (if hl-sexp-foreground-color
+        (setq attribute (plist-put attribute :foreground hl-sexp-foreground-color)))
+    (if hl-sexp-background-color
+        (setq attribute (plist-put attribute :background hl-sexp-background-color)))
+    (set (make-local-variable 'hl-sexp-overlay) (make-overlay 0 0))
+    (overlay-put hl-sexp-overlay 'face attribute)))
+
+(defun hl-sexp-handle-clone-indirect-buffer ()
+  "Set hl-sexp-overlay correctly when the buffer is cloned."
+  (set (make-local-variable 'hl-sexp-overlay) (copy-overlay hl-sexp-overlay))
+  (move-overlay hl-sexp-overlay
+                (overlay-start hl-sexp-overlay)
+                (overlay-end hl-sexp-overlay)
+                (current-buffer))
+  (dolist (something (overlay-lists))
+    ;; This is really dirty but `overlay-lists` doesn't return a list
+    ;; of list of overlay, but a mix of it.
+    (cond ((listp something)
+           (dolist (overlay something)
+             (if (and
+                  (not (eq overlay hl-sexp-overlay))
+                  (equal overlay hl-sexp-overlay))
+                 (delete-overlay overlay))))
+          ((overlayp something)
+           (if (and
+                (not (eq something hl-sexp-overlay))
+                (equal something hl-sexp-overlay))
+               (delete-overlay something))))))
+
+  (add-hook 'lisp-mode-hook 'highlight-sexp-mode)
+  (add-hook 'emacs-lisp-mode-hook 'highlight-sexp-mode)
+
+#+end_src
+
+Trying out [[https://github.com/abo-abo/lispy][lispy]] for LISP code editing (disabled for now).
+
+#+begin_src emacs-lisp
+  (use-package lispy
+    :disabled
+    :ensure t
+    :config
+    (defun enable-lispy-mode () (lispy-mode 1))
+    :hook
+    ((clojure-mode
+      emacs-lisp-mode
+      common-lisp-mode
+      scheme-mode
+      lisp-mode) . enable-lispy-mode))
+#+end_src
+
+Some tools for developing Emacs LISP modules and for contributing to MELPA:
+
+- [[https://melpa.org/#/flycheck][Flycheck]]
+  #+begin_src emacs-lisp
+
+  (use-package flycheck
+  :ensure t
+  :config
+  (add-hook 'after-init-hook #'global-flycheck-mode))
+
+  #+end_src
+
+- [[https://github.com/purcell/package-lint][package-lint]]
+  #+begin_src emacs-lisp
+    (use-package package-lint
+      :defer 3)
+  #+end_src
+
+** [[https://www.perl.org/][Perl]].
+
+  #+begin_src emacs-lisp
+(use-package cperl-mode
+  :mode ("\\.p[lm]\\'" . cperl-mode)
+  :interpreter "perl"
+  :config
+  (setq cperl-hairy t))
+  #+end_src
+
+** [[http://fishshell.com/][Fish shell]].
+
+  #+begin_src emacs-lisp
+(use-package fish-mode
+  :mode "\\.fish\\'"
+  :interpreter "fish")
+  #+end_src
+
+** YAML
+
+  #+begin_src emacs-lisp
+        (use-package yaml-mode
+    			:mode ("\\.y[a]ml\\'" . yaml-mode))
+  #+end_src
+
+** [[https://nixos.org/nix/][Nix]] package files
+
+  #+begin_src emacs-lisp
+        (use-package nix-mode
+    			:mode ("\\.nix\\'" . nix-mode))
+  #+end_src
+
+** [[https://github.com/spotify/dockerfile-mode][Dockerfile files]]
+
+  #+begin_src emacs-lisp
+    (use-package dockerfile-mode
+      :ensure t)
+  #+end_src
+
+** [[https://dhall-lang.org/][The Dhall configuration language]]
+
+  #+begin_src emacs-lisp
+    (use-package dhall-mode
+      :ensure t
+      :mode "\\.dhall\\'")
+  #+end_src
+
+
+
+** Other Languages
+
+- [[http://cfengine.com/][CFEngine]] policy files.
+
+  #+begin_src emacs-lisp
+(use-package cfengine
+  :commands cfengine3-mode
+  :mode ("\\.cf\\'" . cfengine3-mode))
+  #+end_src
+
+- Build and check MELPA package definitions
+
+  #+begin_src emacs-lisp
+    (use-package package-build
+      :ensure t)
+    (use-package package-lint
+      :ensure t)
+  #+end_src
+
+
+- [[http://elvish.io/][Elvish shell]]
+
+  #+begin_src emacs-lisp
+    (use-package elvish-mode
+      :ensure t)
+  #+end_src
+
+* Shell & Terminal
+
+#+begin_src emacs-lisp
+
+  (use-package eterm-256color
+    :hook ((term-mode . eterm-256color-mode)
+            (eshell-mode . eterm-256color-mode)))
+
+  (use-package term
+    :config
+    (setq explicit-shell-file-name "bash")
+    (setq term-prompt-regexp "^[^#$%>\n]*[#$%>] *"))
+
+  (use-package vterm
+    :commands vterm
+    :config
+    (setq term-prompt-regexp "^[^#$%>\n]*[#$%>] *")
+    (setq vterm-max-scrollback 10000))
+
+  (defun zoobaer/configure-eshell ()
+    ;; save command history when commands are entered
+    (add-hook  'eshell-pre-command-hook 'eshell-save-some-history)
+
+    ;; truncate buffer for performance
+    (add-to-list 'eshell-output-filter-functions 'eshell-truncate-buffer)
+
+    ;; useful keybindings
+    (define-key eshell-mode-map (kbd "C-r") 'counsel-esh-history)
+    (define-key eshell-mode-map (kbd "<home>") 'eshell-bol)
+
+    (setq
+      eshell-history-size 10000
+      eshell-buffer-maximum-lines 10000
+      eshell-hist-ignoredups t
+      eshell-scroll-to-buttom-on-input t))
+
+  (use-package eshell-git-prompt
+    :ensure t)
+
+  (use-package eshell-syntax-highlighting
+    :after eshell-mode
+    :ensure t ;; Install if not already installed.
+    :config
+    ;; Enable in all Eshell buffers.
+    (eshell-syntax-highlighting-global-mode +1))
+
+  (use-package eshell
+    :hook (eshell-first-time-mode . zoobaer/configure-eshell)
+    :config
+    (with-eval-after-load 'esh-opt
+      (setq eshell-destroy-buffer-when-process-dies t)
+      (setq eshell-visual-commands '("htop" "btop" "zsh" "vim" "screen" "tmux" "top" "less" "more" "lynx" "ncftp" "mutt" "pine" "tin" "trn" "elm" "vi" "emacs -nw")))
+    ;;(eshell-git-prompt-use-theme 'powerline)
+    )
+#+end_src
+
+* Tools
+
+** rx
+
+The =rx= library makes it easier to express regular expressions (I know regex syntax, but in Emacs the quoting makes them very hard to read). The [[https://elpa.gnu.org/packages/xr.html][=xr=]] library is the inverse - can be used to convert regex strings to =rx= syntax, which makes it easier to learn by example.
+
+  #+begin_src emacs-lisp
+    (require 'rx)
+    (use-package xr
+      :ensure t
+      :defer nil)
+  #+end_src
+** heml-pass
+
+Use =helm-pass= as an interface to =pass=.
+
+  #+begin_src emacs-lisp
+    (use-package helm-pass
+      :ensure t)
+  #+end_src
+
+** Git
+
+git interface with some simple configuration I picked up somewhere. When you press ~C-c C-g~, =magit-status= runs full-screen, but when you press ~q~, it restores your previous window setup. Very handy.
+
+  #+begin_src emacs-lisp
+    (use-package magit
+      :diminish auto-revert-mode
+      :bind
+      (("C-c C-g" . magit-status)
+       :map magit-status-mode-map
+       ("q"       . magit-quit-session))
+      :config
+      (defadvice magit-status (around magit-fullscreen activate)
+        "Make magit-status run alone in a frame."
+        (window-configuration-to-register :magit-fullscreen)
+        ad-do-it
+        (delete-other-windows))
+
+      (defun magit-quit-session ()
+        "Restore the previous window configuration and kill the magit buffer."
+        (interactive)
+        (kill-buffer)
+        (jump-to-register :magit-fullscreen)))
+  #+end_src
+
+** ag
+
+Interface to use the [[https://geoff.greer.fm/ag/][silver-searcher]]
+
+  #+begin_src emacs-lisp
+    (use-package ag
+      :ensure t)
+  #+end_src
+
+** Randomize Lines in a Region
+
+Function to randomize the order of lines in a region, from https://www.emacswiki.org/emacs/RandomizeBuffer.
+
+  #+begin_src emacs-lisp
+    (defun my-randomize-region (beg end)
+      "Randomize lines in region from BEG to END."
+      (interactive "*r")
+      (let ((lines (split-string
+                    (delete-and-extract-region beg end) "\n")))
+        (when (string-equal "" (car (last lines 1)))
+          (setq lines (butlast lines 1)))
+        (apply 'insert
+               (mapcar 'cdr
+                       (sort (mapcar
+                              (lambda (x)
+                                (cons (random) (concat x "\n")))
+                              lines)
+                             (lambda (a b) (< (car a) (car b))))))))
+  #+end_src
+
+** Auto-Insert Mode
+
+[[https://www.gnu.org/software/emacs/manual/html_node/autotype/Autoinserting.html][auto-insert mode]] for automatically inserting user-defined templates for certain file types. It's included with Emacs, so I just configure its directory to one inside my Dropbox, and set the hook to run it automatically when opening a file.
+
+  #+begin_src emacs-lisp
+    (use-package autoinsert
+      :ensure nil
+      :custom
+      (auto-insert-directory (concat user-emacs-directory "auto-insert/"))
+      :hook
+      (find-file . auto-insert))
+  #+end_src
+
+** GitHub Gists
+
+Create and manage [[https://gist.github.com/][GitHub gists]]. Setting =gist-view-gist= to =t= makes it open new gists in the web browser automatically after creating them.
+
+  #+begin_src emacs-lisp
+    (use-package gist
+      :ensure t
+      :custom
+      (gist-view-gist t "Automatically open new gists in browser"))
+  #+end_src
+
+** [[https://github.com/jschaf/esup][Emacs Startup Profiler]]
+
+To get detailed stats of what's taking time during initialization.
+
+  #+begin_src emacs-lisp
+    (use-package esup
+      :ensure t)
+  #+end_src
+
+** Command Execution Time
+
+Macro to measure how long a command takes, from https://stackoverflow.com/questions/23622296/emacs-timing-execution-of-function-calls-in-emacs-lisp
+
+#+begin_src emacs-lisp
+  (defmacro measure-time (&rest body)
+    "Measure the time it takes to evaluate BODY."
+    `(let ((time (current-time)))
+       ,@body
+       (message "%.06f" (float-time (time-since time)))))
+#+end_src
+
+** Restart Emacs
+
+Ability to [[https://github.com/iqbalansari/restart-emacs][restart Emacs from within Emacs]]:
+
+  #+begin_src emacs-lisp
+    (use-package restart-emacs
+      :ensure t)
+  #+end_src
+
+** [[https://github.com/magnars/multiple-cursors.el][Multiple cursors]]
+
+  #+begin_src emacs-lisp
+    (use-package multiple-cursors
+      :bind
+      ("C-c m c"   . mc/edit-lines)
+      ("C-c m <"   . mc/mark-next-like-this)
+      ("C-c m >"   . mc/mark-previous-like-this)
+      ("C-c m C-<" . mc/mark-all-like-this))
+  #+end_src
+
+**  Lorem Ipsum
+
+  #+begin_src emacs-lisp
+    (use-package lorem-ipsum
+      :ensure t)
+  #+end_src
+
+**  [[https://github.com/lokedhs/keybase-chat][Emacs support]] for [[https://keybase.io/][Keybase]]:
+
+  #+begin_src emacs-lisp
+    (use-package keybase
+      :disabled
+      :ensure nil
+      :load-path ("lisp/keybase-chat")
+      :config (require 'keybase))
+  #+end_src
+
+** IRC
+
+=erc= configuration for IRC. Based on https://www.reddit.com/r/emacs/comments/8ml6na/tip_how_to_make_erc_fun_to_use/
+
+  #+begin_src emacs-lisp
+    (use-package erc
+      :disabled
+      :custom
+      ;;(erc-autojoin-channels-alist '(("freenode.net" "#elvish" "#hammerspoon"
+      ;;                                "#org-mode")))
+      (erc-autojoin-timing 'ident)
+      (erc-fill-function 'erc-fill-static)
+      (erc-fill-static-center 22)
+      (erc-hide-list '("JOIN" "PART" "QUIT"))
+      (erc-lurker-hide-list '("JOIN" "PART" "QUIT"))
+      (erc-lurker-threshold-time 43200)
+      (erc-nick "zzamboni")
+      (erc-prompt-for-nickserv-password nil)
+      (erc-server-reconnect-attempts 5)
+      (erc-server-reconnect-timeout 3)
+      (erc-track-exclude-types '("JOIN" "MODE" "NICK" "PART" "QUIT"
+                                 "324" "329" "332" "333" "353" "477"))
+      :config
+      (add-to-list 'erc-modules 'notifications)
+      (add-to-list 'erc-modules 'spelling)
+      (erc-services-mode 1)
+      (erc-update-modules))
+  #+end_src
+
+
+* Editing Configuration
+
+Used for text editing.
+
+** [[http://asciidoctor.org/docs/user-manual/][AsciiDoc]]
+
+I also set up =visual-line-mode= and =variable-pitch-mode= here. =adoc-mode= is not so granular as =org-mode= with respect to face assignments, so the variable/fixed distinction does not always work, but it's still pretty good for long-text editing.
+
+  #+begin_src emacs-lisp
+(use-package adoc-mode
+  :mode "\\.asciidoc\\'"
+  :hook
+  (adoc-mode . visual-line-mode)
+  (adoc-mode . variable-pitch-mode))
+  #+end_src
+
+** Typopunct
+
+When [[https://www.emacswiki.org/emacs/TypographicalPunctuationMarks][typopunct]] is enabled (needs to be enabled by hand), automatically inserts “pretty” quotes of the appropriate type.
+
+  #+begin_src emacs-lisp
+    ;; (use-package typopunct
+    ;;   :ensure t
+    ;;   :hook (text-mode . typopunct-mode)
+    ;;   :config
+    ;;   (setq typopunct-quote-style 'english)
+    ;;   (setq typopunct-contexts '((typopunct-guess-context))))
+
+  #+end_src
+
+** Undo Tree
+
+=undo-tree= visualises undo history as a tree for easy navigation (found about this from [[https://jamiecollinson.com/blog/my-emacs-config/#better-undo][Jamie's config]])
+
+  #+begin_src emacs-lisp
+    (use-package undo-tree
+      :ensure nil
+      :diminish undo-tree-mode
+      :config
+      (global-undo-tree-mode 1))
+  #+end_src
+
+
+* Org mode
+
+I have started using [[http://orgmode.org/][org-mode]] to writing, blogging, coding, presentations and more, thanks to the hearty recommendations and information from [[http://www.cmdln.org/][Nick]] and many others. I am duly impressed. I have been a fan of the idea of [[https://en.wikipedia.org/wiki/Literate_programming][literate programming]] for many years, and I have tried other tools before (most notably [[https://www.cs.tufts.edu/~nr/noweb/][noweb]], which I used during grad school for many of my homeworks and projects), but org-mode is the first tool I have encountered which seems to make it practical. Here are some of the resources I have found useful in learning it:
+
+- Howard Abrams' [[http://www.howardism.org/Technical/Emacs/literate-programming-tutorial.html][Introduction to Literate Programming]], which got me jumpstarted into writing code documented with org-mode.
+- Nick Anderson's [[https://github.com/nickanderson/Level-up-your-notes-with-Org][Level up your notes with Org]], which contains many useful tips and configuration tricks.
+- Sacha Chua's [[http://sachachua.com/blog/2014/01/tips-learning-org-mode-emacs/][Some tips for learning Org Mode for Emacs]], her [[http://pages.sachachua.com/.emacs.d/Sacha.html][Emacs configuration]] and many of her [[http://sachachua.com/blog/category/emacs/][other articles]].
+- Rainer König's [[https://www.youtube.com/playlist?list=PLVtKhBrRV_ZkPnBtt_TD1Cs9PJlU0IIdE][OrgMode Tutorial]] video series.
+
+This is the newest and most-in-flux section of my Emacs config, since I'm still learning org-mode myself.
+
+I use =use-package= to load the =org= package, and put its configuration inside the corresponding sections for keybindings (=:bind=), custom variables (=:custom=), custom faces (=:custom-face=), hooks (=:hook=) and general configuration code (=:config=), respectively. The contents of each section is populated with the corresponding snippets that follow. See the sections below for the details on what goes into each configuration section, and some other configuration code that ends up outside this declaration.
+
+#+begin_src emacs-lisp :noweb no-export
+  (use-package org
+    ;;    :pin manual
+    :load-path ("lisp/org-mode/lisp" "lisp/org-mode/lisp/contrib/lisp")
+    :bind
+    (:map org-mode-map
+     <<org-mode-keybindings>>)
+    :custom
+    <<org-mode-custom-vars>>
+    :custom-face
+    <<org-mode-faces>>
+    :hook
+    <<org-mode-hooks>>
+    :config
+    <<org-mode-config>>)
+#+end_src
+
+** General Org Configuration
+
+Note that mode-specific configuration variables are defined under  their corresponding packages, this  section defines only global org-mode configuration variables, which are inserted in the main =use-package= declaration for =org-mode=.
+
+- Default directory for org files (not all are stored here).
+
+  #+begin_src emacs-lisp :tangle no  :noweb-ref org-mode-custom-vars
+    (org-directory "~/org")
+  #+end_src
+
+- Automatically log done times in todo items.
+
+  #+begin_src emacs-lisp :tangle no :noweb-ref org-mode-custom-vars
+    (org-log-done t)
+  #+end_src
+
+- Keep the indentation well structured by setting =org-startup-indented= to =t=. This is a must have. Makes it feel less like editing a big text file and more like a purpose built editor for org-mode that forces the indentation. Thanks [[https://github.com/nickanderson/Level-up-your-notes-with-Org/blob/master/Level-up-your-notes-with-Org.org#automatic-visual-indention][Nick]] for the tip!
+
+  #+begin_src emacs-lisp :tangle no :noweb-ref org-mode-custom-vars
+    (org-startup-indented t)
+  #+end_src
+
+  By default, =org-indent= produces an indicator ="Ind"= in the modeline. We use diminish to hide it. I also like to increase  the indentation a bit so that  the levels are more visible.
+
+  #+begin_src emacs-lisp
+    (use-package org-indent
+      :ensure nil
+      :diminish
+      :custom
+      (org-indent-indentation-per-level 4))
+  #+end_src
+
+- Log stuff into the LOGBOOK drawer by default
+
+  #+begin_src emacs-lisp :tangle no :noweb-ref org-mode-custom-vars
+    (org-log-into-drawer t)
+  #+end_src
+
+** General Org  Keybindings
+
+Note that other keybindings are configured under their corresponding packages, this section defines only global org-mode keybindings, which are inserted in the main =use-package= declaration for =org-mode=.
+
+- Use the special ~C-a~, ~C-e~ and ~C-k~ definitions for Org, which enable some special behavior in headings.
+
+  #+begin_src emacs-lisp :tangle no :noweb-ref org-mode-custom-vars
+    (org-special-ctrl-a/e t)
+    (org-special-ctrl-k t)
+  #+end_src
+
+- Set up =C-c l= to store a link to the current org object, in counterpart to the default =C-c C-l= to insert a link.
+
+  #+begin_src emacs-lisp :tangle no :noweb-ref org-mode-keybindings
+    ("C-c l" . org-store-link)
+  #+end_src
+
+- The default keybinding for =org-mark-element= is =M-h=, which in macOS hides the current application, so I bind it to =A-h=.
+
+  #+begin_src emacs-lisp :tangle no :noweb-ref org-mode-keybindings
+    ("A-h" . org-mark-element)
+  #+end_src
+
+Enable [[https://orgmode.org/manual/Speed-keys.html][Speed Keys]], which allows quick single-key commands when the cursor is placed on a heading. Usually the cursor needs to be at the beginning of a headline line, but defining it with this function makes them active on any of the asterisks at the beginning of the line (useful with the [[*Beautifying org-mode][font highlighting I use]], as all but the last asterisk are sometimes not visible).
+
+#+begin_src emacs-lisp :tangle no :noweb-ref org-mode-custom-vars
+  (org-use-speed-commands
+   (lambda ()
+     (and (looking-at org-outline-regexp)
+       (looking-back "^\**"))))
+#+end_src
+
+** Capturing stuff
+
+First, I define some global keybindings  to open my frequently-used org files (original tip from [[https://sachachua.com/blog/2015/02/learn-take-notes-efficiently-org-mode/][Learn how to take notes more efficiently in Org Mode]]).
+
+I define a helper function to define keybindings that open files. Since I use the =which-key= package, it also defines the description of the key that will appear in the =which-key= menu. Note the use of =lexical-let= so that  the =lambda= creates a closure, otherwise the keybindings don't work.
+
+#+begin_src emacs-lisp
+  (defun zz/add-file-keybinding (key file &optional desc)
+    (lexical-let ((key key)
+                  (file file)
+                  (desc desc))
+      (global-set-key (kbd key) (lambda () (interactive) (find-file file)))
+      (which-key-add-key-based-replacements key (or desc file))))
+#+end_src
+
+Now I define keybindings to access my commonly-used org files, and add them to =org-agenda-files=
+
+#+begin_src emacs-lisp
+  (custom-set-variables '(org-agenda-files
+                          '("~/gtd" "~/Work/work.org.gpg" "~/org/ideas.org" "~/org/projects.org" "~/org/diary.org")))
+  (zz/add-file-keybinding "C-c f w" "~/Work/work.org.gpg" "work.org")
+  (zz/add-file-keybinding "C-c f i" "~/org/ideas.org" "ideas.org")
+  (zz/add-file-keybinding "C-c f p" "~/org/projects.org" "projects.org")
+  (zz/add-file-keybinding "C-c f d" "~/org/diary.org" "diary.org")
+#+end_src
+
+=org-capture= provides  a generic and extensible interface  to capturing things  into org-mode in  different formats. I set up ~C-c c~  as the default  keybinding for triggering =org-capture=. Usually setting up a new capture template requires  some custom code,  which  gets defined in  the corresponding package config sections and included in the =:config= section below.
+
+#+begin_src emacs-lisp :noweb no-export
+  (use-package org-capture
+    :ensure nil
+    :after org
+    :defer 1
+    :bind
+    ("C-c c" . org-capture)
+    :config
+    <<org-capture-config>>
+    )
+#+end_src
+
+Define all my org agenda files as targets for refiling.
+
+#+begin_src emacs-lisp
+  (setq org-refile-targets '((nil :maxlevel . 9)
+                             (org-agenda-files :maxlevel . 9)))
+  (setq org-outline-path-complete-in-steps nil)         ; Refile in a single go
+  (setq org-refile-use-outline-path t)                  ; Show full paths for refiling
+#+end_src
+** Task tracking
+
+Org-Agenda is the umbrella for all todo, journal, calendar, and other views. I set up =C-c a= to call up agenda mode.
+
+#+begin_src emacs-lisp
+  (use-package org-agenda
+    :ensure nil
+    :after org
+    :bind
+    ("C-c a" . org-agenda)
+    :custom
+    (org-agenda-include-diary t)
+    (org-agenda-prefix-format '((agenda . " %i %-12:c%?-12t% s")
+                                ;; Indent todo items by level to show nesting
+                                (todo . " %i %-12:c%l")
+                                 (tags . " %i %-12:c")
+                                (search . " %i %-12:c")))
+    (org-agenda-start-on-weekday nil))
+
+#+end_src
+
+I also provide some customization for the =holidays= package, since its entries are included in the Org Agenda through the =org-agenda-include-diary= integration.
+
+#+begin_src emacs-lisp
+  (use-package holidays
+    :defer nil
+    :ensure nil
+    :init
+    :config
+    (setq calendar-holidays holiday-islamic-holidays)))
+#+end_src
+
+[[https://github.com/alphapapa/org-super-agenda][org-super-agenda]] provides great grouping and customization features to make agenda mode easier to use.
+
+#+begin_src emacs-lisp
+  ;; (require 'org-habit)
+  ;; (use-package org-super-agenda
+  ;;   :ensure t
+  ;;   :defer nil
+  ;;   :custom
+  ;;   (org-super-agenda-groups '((:auto-dir-name t)))
+  ;;   :config
+  ;;   (org-super-agenda-mode))
+#+end_src
+
+I configure =org-archive= to archive completed TODOs by default to the =archive.org= file in the same directory as the source file, under the "date tree" corresponding to the task's CLOSED date - this allows me to easily separate work from non-work stuff. Note that this can be overridden for specific files by specifying the desired value of =org-archive-location= in the =#+archive:= property at the top of the file.
+
+#+begin_src emacs-lisp
+  (use-package org-archive
+    :ensure nil
+    :custom
+    (org-archive-location "archive.org::datetree/"))
+#+end_src
+
+Trying out [[https://github.com/Trevoke/org-gtd.el][org-gtd]]:
+
+#+begin_src emacs-lisp
+  (use-package org-edna
+    :ensure t
+    :defer nil)
+  (use-package org-gtd
+    :defer 3
+    :after org
+    :config
+    (require 'org-gtd)
+    ;; these are the interactive functions you're likely to want to use as you go about GTD.
+    (global-set-key (kbd "C-c d c") 'org-gtd-capture) ;; add item to inbox
+    (global-set-key (kbd "C-c d p") 'org-gtd-process-inbox) ;; process entire inbox
+    (global-set-key (kbd "C-c d a") 'org-agenda-list) ;; see what's on your plate today
+    (global-set-key (kbd "C-c d n") 'org-gtd-show-all-next) ;; see all NEXT items
+    (global-set-key (kbd "C-c d s") 'org-gtd-show-stuck-projects) ;; see projects that don't have a NEXT item
+
+    ;; package: https://www.nongnu.org/org-edna-el/
+    ;; org-edna is used to make sure that when a project task gets DONE,
+    ;; the next TODO is automatically changed to NEXT.
+    (setq org-edna-use-inheritance t)
+    (org-edna-load)
+
+    ;; package: https://github.com/Malabarba/org-agenda-property
+    ;; this is so you can see who an item was delegated to in the agenda
+    (setq org-agenda-property-list '("DELEGATED_TO"))
+    ;; I think this makes the agenda easier to read
+    (setq org-agenda-property-position 'next-line))
+#+end_src
+
+#+begin_src emacs-lisp :tangle no :noweb-ref org-capture-config
+  (add-to-list 'org-capture-templates
+               '("i" "GTD item"
+                 entry (file (lambda () (org-gtd--path org-gtd-inbox-file-basename)))
+                 "* %?\n%U\n\n  %i"
+                 :kill-buffer t))
+  (add-to-list 'org-capture-templates
+               '("l" "GTD item with link to where you are in emacs now"
+                 entry (file (lambda () (org-gtd--path org-gtd-inbox-file-basename)))
+                 "* %?\n%U\n\n  %i\n  %a"
+  								:kill-buffer t))
+
+#+end_src
+** Note taking
+
+I'm testing a new library called [[https://github.com/jethrokuan/org-roam][org-roam]] for non-hierarchical note taking.
+
+Install and load dependencies first.
+
+#+begin_src emacs-lisp
+  (use-package emacsql
+    :ensure t
+    :defer nil)
+
+  ;; (use-package emacsql-sqlite
+  ;;   :ensure t
+  ;;   :after emacsql
+  ;;   :defer nil)
+#+end_src
+
+Then we load =org-roam= itself.
+
+#+begin_src emacs-lisp
+  (use-package org-roam
+    :after (org emacsql emacsql-sqlite)
+    :load-path "lisp/org-roam"
+    :diminish
+    :hook
+    ((org-mode . org-roam-mode)
+     (after-init . org-roam--build-cache-async))
+    :custom
+    (org-roam-directory "~/org")
+    :bind
+    ("C-c n l" . org-roam)
+    ("C-c n t" . org-roam-today)
+    ("C-c n f" . org-roam-find-file)
+    ("C-c n i" . org-roam-insert)
+    ("C-c n g" . org-roam-show-graph))
+#+end_src
+
+=org-roam= [[https://org-roam.readthedocs.io/en/develop/ecosystem/#deft][integrates nicely with =deft=]]:
+
+#+begin_src emacs-lisp
+  (use-package deft
+    :after org
+    :bind
+    ("C-c n d" . deft)
+    :custom
+    (deft-directory org-directory)
+    (deft-recursive t)
+    (deft-use-filename-as-title nil)
+    (deft-use-filter-string-for-filename t)
+    (deft-file-naming-rules '((noslash . "-")
+                              (nospace . "-")
+                              (case-fn . downcase)))
+    (deft-org-mode-title-prefix t)
+    (deft-extensions '("org" "txt" "text" "md" "markdown" "org.gpg"))
+    (deft-default-extension "org"))
+#+end_src
+
+Using =org-download= to make it easier to insert images into my org notes.
+
+#+begin_src emacs-lisp
+  (use-package org-download
+    :ensure t
+    :after org
+    :defer nil
+    :custom
+    (org-download-method 'directory)
+    (org-download-image-dir "images")
+    (org-download-heading-lvl nil)
+    (org-download-timestamp "%Y%m%d-%H%M%S_")
+    (org-image-actual-width 300)
+    :bind
+    ("C-M-y" .
+     (lambda (&optional noask)
+       (interactive "P")
+       (let ((file
+               (if (not noask)
+                  (read-string (format "Filename [%s]: " org-download-screenshot-basename)
+                               nil nil org-download-screenshot-basename)
+                nil)))
+         (org-download-clipboard file))))
+    :config
+    (require 'org-download))
+#+end_src
+
+** Building presentations
+
+[[https://github.com/yjwen/org-reveal][org-reveal]] is an awesome package for building presentations with org-mode. The MELPA version of the package gives me a conflict with my hand-installed version of org-mode, so I also install it by hand and load it directly from its checked-out repository.
+
+#+begin_src emacs-lisp
+  (use-package ox-reveal
+    :load-path ("lisp/org-reveal")
+    :defer 3
+    :after org
+    :custom
+    (org-reveal-note-key-char nil)
+    (org-reveal-root "file:///Users/taazadi1/.emacs.d/lisp/reveal.js"))
+  (use-package htmlize
+    :defer 3
+    :after ox-reveal)
+#+end_src
+
+** Various exporters
+
+One of the big strengths of org-mode is the ability to export a document in many different formats. Here I load some of the exporters I have found useful.
+
+- HTML
+
+  #+begin_src emacs-lisp
+    (use-package ox-html
+      :ensure nil
+      :defer 3
+      :after org
+      :custom
+      (org-html-checkbox-type 'unicode))
+  #+end_src
+
+- Markdown
+
+  #+begin_src emacs-lisp
+    (use-package ox-md
+      :ensure nil
+      :defer 3
+      :after org)
+  #+end_src
+
+- [[https://github.com/stig/ox-jira.el][Jira markup]]. I also load =org-jira=, which provides a full interface to Jira through org-mode.
+
+  #+begin_src emacs-lisp
+    (use-package ox-jira
+      :defer 3
+      :after org)
+  #+end_src
+
+  # This is the real code, which gets tangled out to my config file
+  #+begin_src emacs-lisp :exports none
+    (use-package org-jira
+      :defer 3
+      :after org
+      :custom
+      (jiralib-url "https://jira.swisscom.com"))
+  #+end_src
+
+  # This is the version exported to blog posts and books, without the company name.
+  #+begin_src emacs-lisp :tangle no
+    (use-package org-jira
+      :defer 3
+      :after org
+      :custom
+      (jiralib-url "https://jira.work.com"))
+  #+end_src
+
+- Confluence markup.
+
+  #+begin_src emacs-lisp
+    (use-package ox-confluence
+      :defer 3
+      :ensure nil
+      :after org)
+  #+end_src
+
+- AsciiDoc
+
+  #+begin_src emacs-lisp
+    (use-package ox-asciidoc
+      :defer 3
+      :after org)
+  #+end_src
+
+- TexInfo. I have found that the best way to produce a PDF from an org file is to export it to a =.texi= file, and then use =texi2pdf= to produce the PDF.
+
+  #+begin_src emacs-lisp
+    (use-package ox-texinfo
+      :load-path "lisp/org-mode/lisp"
+      :defer 3
+      :ensure nil
+      :after org)
+  #+end_src
+
+#+name: latex-exporter-settings
+- Some customizations for the LaTeX exporter. =ox-latex= gets loaded automatically, but we use =use-package= anyway so that the config code is only executed after the package is loaded. I add a pseudo-class which uses the document class =book= but without parts (only chapters at the top level).
+
+  #+begin_src emacs-lisp
+    (use-package ox-latex
+      :load-path "lisp/org-mode/lisp"
+      :ensure nil
+      :demand
+      :after org
+      :custom
+      (org-latex-compiler "xelatex")
+      ;; (org-latex-pdf-process
+      ;;  '("%latex -shell-escape -interaction nonstopmode -output-directory %o %f"
+      ;;    "%latex -interaction nonstopmode -output-directory %o %f"
+      ;;    "%latex -interaction nonstopmode -output-directory %o %f"))
+      :config
+      ;; (setq org-latex-listings 'minted)
+      ;; (add-to-list 'org-latex-packages-alist '("newfloat" "minted"))
+      ;; (add-to-list 'org-latex-minted-langs '(lua "lua"))
+      ;; (add-to-list 'org-latex-minted-langs '(shell "shell"))
+      (add-to-list 'org-latex-classes
+                   '("book-no-parts" "\\documentclass[11pt,letterpaper]{book}"
+                     ("\\chapter{%s}" . "\\chapter*{%s}")
+                     ("\\section{%s}" . "\\section*{%s}")
+                     ("\\subsection{%s}" . "\\subsection*{%s}")
+    									("\\subsubsection{%s}" . "\\subsubsection*{%s}")
+                     ("\\paragraph{%s}" . "\\paragraph*{%s}")))
+      ;; Necessary for LuaLaTeX to work - see
+      ;; https://tex.stackexchange.com/a/374391/10680
+      (setenv "LANG" "en_US.UTF-8"))
+  #+end_src
+
+- [[https://github.com/jkitchin/ox-clip][ox-clip]] to export HTML-formatted snippets.
+
+  #+begin_src emacs-lisp
+    (use-package ox-clip
+      :bind
+      ("A-C-M-k" . ox-clip-formatted-copy))
+  #+end_src
+
+- I use =ox-awesomecv= and =ox-hugocv= from [[https://titan-c.gitlab.io/org-cv/][Org-CV]], to export my [[https://github.com/zzamboni/vita/][Curriculum Vit\aelig]].
+
+  #+begin_src emacs-lisp
+    ;;(use-package ox-awesomecv
+      ;;:load-path "~/.emacs.d/lisp/org-cv"
+      ;;:init
+      ;;(require 'ox-awesomecv))
+    ;;(use-package ox-hugocv
+    ;;  :disabled
+    ;;  :load-path "~/.emacs.d/lisp/org-cv"
+    ;;  :init
+    ;;  (require 'ox-hugocv))
+  #+end_src
+
+- I use =ox-org= to generate an org file from another. For example, the =README.org= file for my [[https://github.com/zzamboni/elvish-modules][elvish-modules]] package is generated by exporting from [[https://github.com/zzamboni/elvish-modules/blob/master/README-src.org][README-src.org]], to automatically extract summaries from the different module files.
+
+  #+begin_src emacs-lisp
+    (use-package ox-org
+      :ensure nil
+      :defer 3
+      :after org)
+  #+end_src
+
+** Blogging with Hugo
+
+[[https://ox-hugo.scripter.co/][ox-hugo]] is an awesome way to blog from org-mode. It makes it possible for posts in org-mode format to be kept separate, and it generates the Markdown files for Hugo. Hugo [[https://gohugo.io/content-management/formats/][supports org files]], but using ox-hugo has multiple advantages:
+
+- Parsing is done by org-mode natively, not by an external library. Although goorgeous (used by Hugo) is very good, it still lacks in many areas, which leads to text being interpreted differently as by org-mode.
+- Hugo is left to parse a native Markdown file, which means that many of its features such as shortcodes, TOC generation, etc., can still be used on the generated file.
+- I am intrigued by ox-hugo's "one post per org subtree" proposed structure. So far I've always had one file per post, but with org-mode's structuring features, it might make sense to give it a try.
+
+#+begin_src emacs-lisp
+  (use-package ox-hugo
+    :defer 3
+    :after org
+    ;; Testing hooks to automatically set the filename on an ox-hugo
+    ;; blog entry when it gets marked as DONE
+    ;; :hook
+    ;; (org-mode . (lambda ()
+    ;;               (add-hook 'org-after-todo-state-change-hook
+    ;;                         (lambda ()
+    ;;                           (org-set-property
+    ;;                            "testprop"
+    ;;                            (concat "org-state: " org-state
+    ;;                                    " prev-state: " (org-get-todo-state))))
+    ;;                         'run-at-end 'only-in-org-mode)))
+    :custom
+    (org-hugo-use-code-for-kbd t))
+#+end_src
+
+Configure a capture template for creating new ox-hugo blog posts, from [[https://ox-hugo.scripter.co/doc/org-capture-setup][ox-hugo's Org Capture Setup]].
+
+#+begin_src emacs-lisp :tangle no :noweb-ref org-capture-config
+  (defun org-hugo-new-subtree-post-capture-template ()
+    "Returns `org-capture' template string for new Hugo post.
+    See `org-capture-templates' for more information."
+    (let* ((title (read-from-minibuffer "Post Title: "))
+           (fname (org-hugo-slug title)))
+      (mapconcat #'identity
+                 `(,(concat "* TODO " title)
+                   ":PROPERTIES:"
+                   ,(concat ":EXPORT_HUGO_BUNDLE: " fname)
+                   ":EXPORT_FILE_NAME: index"
+                   ":END:"
+  									"%?\n") ; Place the cursor here finally
+                 "\n")))
+  (add-to-list 'org-capture-templates
+               '("z"       ;`org-capture' binding + z
+                 "zzamboni.org post"
+                 entry
+                 (file+olp "~/Personal/websites/zzamboni.org/content-org/zzamboni.org" "Ideas")
+                 (function org-hugo-new-subtree-post-capture-template)))
+#+end_src
+
+** Encryption
+
+First, load the built-in EasyPG support. By calling =(epa-file-enable)=, Emacs automatically encrypts/decrypts files with a =.gpg= extension. By default it asks about the key to use, but I configure it to always use my own GPG key.
+
+#+begin_src emacs-lisp
+  (use-package epa-file
+    :ensure nil ;; included with Emacs
+    :config
+    (setq epa-file-encrypt-to '("diego@zzamboni.org"))
+    :custom
+    (epa-file-select-keys 'silent))
+#+end_src
+
+Then, load [[https://orgmode.org/worg/org-tutorials/encrypting-files.html][org-crypt]] to enable selective  encryption/decryption using GPG within org-mode.
+
+#+begin_src emacs-lisp
+  (use-package org-crypt
+    :ensure nil  ;; included with org-mode
+    :after org
+    :config
+    (org-crypt-use-before-save-magic)
+    (setq org-tags-exclude-from-inheritance (quote ("crypt")))
+    :custom
+    (org-crypt-key "diego@zzamboni.org"))
+#+end_src
+
+** Keeping a Journal
+
+I use [[http://750words.com/][750words]] for my personal Journal, and I used  to write my entries locally using Scrivener. Now I am using  =org-journal= for this, works quite well  together with =wc-mode= to keep  a count of how many words I have written.
+
+In order to keep my journal entries encrypted there are two separate but confusingly named mechanisms:
+
+- =org-journal-encrypt-journal=, if set to =t= has the effect of transparently encrypting/decrypting the journal files as they are written to disk. This is what  I use.
+- =org-journal-enable-encryption=, if set to =t=, enables integration with =org-crypt= (see above),  so it automatically adds a =:crypt:= tag to new journal entries. This has the effect of automatically encrypting those entries upon save, replacing them with a blob of gpg-encrypted text which has to be further decrypted with =org-decrypt-entry= in order to read or edit them again. I have disabled it for now to make it more transparent to  work with my journal entries while I am editing them.
+
+#+begin_src emacs-lisp
+  (use-package org-journal
+    :after org
+    :custom
+    (org-journal-dir (concat (file-name-as-directory org-directory) "journal"))
+    (org-journal-file-format "%Y/%m/%Y%m%d")
+    (org-journal-date-format "%A, %Y-%m-%d")
+    (org-journal-encrypt-journal t)
+    (org-journal-enable-encryption nil)
+    (org-journal-enable-agenda-integration t)
+    :bind
+    ("C-c j" . org-journal-new-entry))
+#+end_src
+
+** Literate programming
+
+Org-mode is the first literate programming tool that seems practical and useful, since it's easy to edit, execute and document code from within the same tool (Emacs) using all of its existing capabilities (i.e. each code block can be edited in its native Emacs mode, taking full advantage of indentation, completion, etc.)
+
+First, we load the necessary programming language support. The base features and literate programming for Emacs LISP is built-in, but the =ob-*= packages provide the ability to execute code in different languages directly from within the Org buffer, beyond those included with org-mode. I load the modules for some of the languages I use frequently:
+
+- CFEngine, used extensively for my book [[https://cf-learn.info][/Learning CFEngine/]].
+
+  #+begin_src emacs-lisp
+    ;;(use-package ob-cfengine3
+    ;;  :after org)
+  #+end_src
+
+- Elvish, my favorite shell.
+
+  #+begin_src emacs-lisp
+;;(use-package ob-elvish
+;;  :after org)
+  #+end_src
+
+- The [[http://plantuml.com/][PlantUML]] graph language.
+
+  We determine the location of the PlantUML jar file automatically from the installed Homebrew formula.
+
+  #+name: plantuml-jar-path
+  #+begin_src shell :tangle no :noweb-ref plantuml-jar-command :exports both
+brew list plantuml | grep jar
+  #+end_src
+
+Which in my current setup results in the following:
+
+#+RESULTS: plantuml-jar-path
+: /usr/local/Cellar/plantuml/1.2020.15/libexec/plantuml.jar
+
+The command defined above is used to define the value of the =homebrew-plantuml-jar-path= variable. If you don't use Homebrew of have installed PlantUML some other way, you need to modify this command, or hard-code the path.
+
+#+begin_src emacs-lisp :noweb yes
+  (require 'subr-x)
+  (setq homebrew-plantuml-jar-path
+    (expand-file-name
+         (string-trim
+          (shell-command-to-string "<<plantuml-jar-command>>"))))
+#+end_src
+
+Finally, we use this value to configure both =plantuml-mode= (for syntax highlighting) and =ob-plantuml= (for evaluating PlantUML code and inserting the results in exported Org documents).
+
+#+begin_src emacs-lisp :noweb yes
+  (use-package plantuml-mode
+    :ensure t
+    :custom
+    (plantuml-jar-path homebrew-plantuml-jar-path))
+
+  (use-package ob-plantuml
+    :ensure nil
+    :after org
+    :custom
+    (org-plantuml-jar-path homebrew-plantuml-jar-path))
+#+end_src
+
+- Define =shell-script-mode= as an alias for =console-mode=, so that =console= src blocks can be edited and are fontified correctly.
+
+  #+begin_src emacs-lisp
+    (defalias 'console-mode 'shell-script-mode)
+  #+end_src
+
+- Finally, from all  the available languages, we configure the  ones for which to load =org-babel= support.
+
+  #+begin_src emacs-lisp :tangle no :noweb-ref org-mode-config
+    (org-babel-do-load-languages
+     'org-babel-load-languages
+     '(
+       ;; (cfengine3 . t)
+       (ruby      . t)
+       (latex     . t)
+       (plantuml  . t)
+       (python    . t)
+       (shell     . t)
+       ;;(elvish    . t)
+       (calc      . t)
+       (dot       . t)
+       (ditaa     . t)
+       (org       . t)
+       (lua       . t)
+       ;;(powershell . t)
+       ))
+  #+end_src
+
+
+- You can define shortcuts for writing src code in org
+
+  #+begin_src emacs-lisp
+    (required 'org-tempo)
+
+    (add-to-list 'org-structure-template-alist '("sh" . "src shell"))
+    (add-to-list 'org-structure-template-alist '("el" . "src emacs-lisp"))
+    (add-to-list 'org-structure-template-alist '("py" . "src python"))
+    (add-to-list 'org-structure-template-alist '("lua" . "src lua"))
+    (add-to-list 'org-structure-template-alist '("sh" . "src shell"))
+
+  #+end_src
+
+Now, we configure some other =org-babel= settings:
+
+- Tangle-on-save has revolutionized my literate programming workflow. It automatically runs =org-babel-tangle= upon saving any org-mode buffer, which means the resulting files will be automatically kept up to date. For a long time I simply had the following hook:
+
+  #+begin_src emacs-lisp :tangle no :noweb-ref org-mode-hooks
+    (org-mode . (lambda () (add-hook 'after-save-hook 'org-babel-tangle :append :local)))
+  #+end_src
+
+  This is simple and it works, the only disadvantage is that it runs the tangle process synchronously, so Emacs freezes until the =org-babel-tangle= command is done. For large files (such as this one), the delay is noticeable, so I also had some hooks to measure and report the tangle time:
+
+  #+begin_src emacs-lisp :tangle no :noweb-ref org-mode-config-disabled
+    (defun zz/report-tangle-time (start-time)
+      (message "org-babel-tangle took %s"
+               (format "%.2f seconds"
+                       (float-time (time-since start-time)))))
+  #+end_src
+
+  #+begin_src emacs-lisp :tangle no :noweb-ref org-mode-hooks-disabled
+    (org-babel-pre-tangle  . (lambda ()
+                               (setq zz/pre-tangle-time (current-time))))
+    (org-babel-post-tangle . (lambda ()
+                               (zz/report-tangle-time zz/pre-tangle-time)))
+  #+end_src
+
+  Thanks to [[https://lists.gnu.org/archive/html/emacs-orgmode/2019-12/msg00191.html][the kind help of Ihor in the emacs-orgmode mailing list]], I now have an asynchronous version of this, which dispatches the tangle function to a subprocess, so that the main Emacs is not blocked while it runs. The =zz/org-babel-tangle-async= function uses the [[https://github.com/jwiegley/emacs-async][emacs-async]] package to start the tangle operation in a child process. Note that the child Emacs started by =async-start= is empty, without any configuration, so we need to load =org= before tangling. Depending on your setup, you may need to load more configuration.
+
+  #+begin_src emacs-lisp
+    (defun zz/org-babel-tangle-async (file)
+      "Invoke `org-babel-tangle-file' asynchronously."
+      (message "Tangling %s..." (buffer-file-name))
+      (async-start
+       (let ((args (list file)))
+         `(lambda ()
+            (require 'org)
+            ;;(load "~/.emacs.d/init.el")
+            (let ((start-time (current-time)))
+              (apply #'org-babel-tangle-file ',args)
+              (format "%.2f" (float-time (time-since start-time))))))
+       (let ((message-string (format "Tangling %S completed after " file)))
+         `(lambda (tangle-time)
+            (message (concat ,message-string
+                       (format "%s seconds" tangle-time)))))))
+
+    (defun zz/org-babel-tangle-current-buffer-async ()
+      "Tangle current buffer asynchronously."
+      (zz/org-babel-tangle-async (buffer-file-name)))
+  #+end_src
+
+  Finally, we set up an =org-mode= hook which adds the async tangle function to the =after-save-hook=, so that it happens automatically after every save. Disabled for now because the tangle is getting interrupted sometimes when I move the cursor before the async tangle finishes, leaving files incomplete.
+
+  #+begin_src emacs-lisp :tangle no :noweb-ref org-mode-hooks-disabled
+    (org-mode . (lambda () (add-hook 'after-save-hook
+                             'zz/org-babel-tangle-current-buffer-async
+                                     'run-at-end 'only-in-org-mode)))
+  #+end_src
+
+- This is potentially dangerous: it suppresses the query before executing code from within org-mode. I use it because I am very careful and only press =C-c C-c= on blocks I absolutely understand.
+
+  #+begin_src emacs-lisp :tangle no :noweb-ref org-mode-custom-vars
+    (org-confirm-babel-evaluate nil)
+  #+end_src
+
+- This makes it so that code within =src= blocks is fontified according to their corresponding Emacs mode, making the file much more readable.
+
+  #+begin_src emacs-lisp :tangle no :noweb-ref org-mode-custom-vars
+    (org-src-fontify-natively t)
+  #+end_src
+
+- In principle this makes it so that indentation in =src= blocks works as in their native mode, but in my experience it does not always work reliably. For full proper indentation, always edit the code in a native buffer by pressing =C-c '=.
+
+  #+begin_src emacs-lisp :tangle no :noweb-ref org-mode-custom-vars
+    (org-src-tab-acts-natively t)
+  #+end_src
+
+- Automatically show inline images, useful when executing code that produces them, such as PlantUML or Graphviz.
+
+  #+begin_src emacs-lisp :tangle no :noweb-ref org-mode-hooks
+    (org-babel-after-execute . org-redisplay-inline-images)
+  #+end_src
+
+** Beautifying org-mode
+:PROPERTIES:
+:CUSTOM_ID: beautifying-org-mode
+:END:
+
+*** Emphasis, lists and bullets
+
+These settings make org-mode much more readable by using different fonts for headings, hiding some of the markup, etc. This was taken originally from Howard Abrams' [[http://www.howardism.org/Technical/Emacs/orgmode-wordprocessor.html][Org as a Word Processor]], and subsequently tweaked and broken up in the different parts of the =use-package= declaration by me.
+
+First, we set =org-hid-emphasis-markers= so that the markup indicators are not shown.
+
+#+begin_src emacs-lisp :tangle no :noweb-ref org-mode-custom-vars
+  (org-hide-emphasis-markers t)
+#+end_src
+
+We add an entry to the org-mode font-lock table so that list markers are shown with a middle dot instead of the original character.
+
+#+begin_src emacs-lisp :tangle no :noweb-ref org-mode-config
+  (font-lock-add-keywords
+  	'org-mode
+   '(("^ *\\([-]\\) "
+      (0 (prog1 () (compose-region (match-beginning 1) (match-end 1) "•"))))))
+#+end_src
+
+We use the =org-bullets= package to display the titles with nice unicode bullets instead of the text ones.
+
+#+begin_src emacs-lisp
+  (use-package org-bullets
+    :ensure t
+    :after org
+    :hook
+    (org-mode . (lambda () (org-bullets-mode 1))))
+#+end_src
+
+Prettify checkbox lists and other symbols - courtesy of https://blog.jft.rocks/emacs/unicode-for-orgmode-checkboxes.html. First, we add special characters for checkboxes:
+
+#+begin_src emacs-lisp :tangle no :noweb-ref org-mode-hooks
+  (org-mode . (lambda ()
+                "Beautify Org Checkbox Symbol"
+               ;; (push '("[ ]" . "☐" ) prettify-symbols-alist)
+               ;; (push '("[X]" . "☑" ) prettify-symbols-alist)
+               ;; (push '("[-]" . "⊡" ) prettify-symbols-alist)
+                (prettify-symbols-mode)))
+#+end_src
+
+Show symbols when the cursor is over of right after them.
+
+#+begin_src emacs-lisp :tangle no :noweb-ref org-mode-custom-vars
+  (prettify-symbols-unprettify-at-point 'right-edge)
+#+end_src
+
+Second, we define a special face for checked items.
+
+#+begin_src emacs-lisp :tangle no :noweb-ref org-mode-config
+  (defface org-checkbox-done-text
+    '((t (:foreground "#71696A" :strike-through t)))
+    "Face for the text part of a checked org-mode checkbox.")
+
+  (font-lock-add-keywords
+   'org-mode
+  	`(("^[ \t]*\\(?:[-+*]\\|[0-9]+[).]\\)[ \t]+\\(\\(?:\\[@\\(?:start:\\)?[0-9]+\\][ \t]*\\)?\\[\\(?:X\\|\\([0-9]+\\)/\\2\\)\\][^\n]*\n\\)"
+      1 'org-checkbox-done-text prepend))
+   'append)
+#+end_src
+
+*** Headings
+
+We choose a nice font for the document title and the section headings. The first one found in the system from the list below is used, and the same font is used for the different levels, in varying sizes.
+
+#+begin_src emacs-lisp :tangle no :noweb-ref org-mode-config
+
+  ;; (let* ((variable-tuple
+  ;;         (cond ((x-list-fonts   "ETBembo")         '(:font   "ETBembo"))
+  ;;               ((x-list-fonts   "Source Sans Pro") '(:font   "Source Sans Pro"))
+  ;;               ((x-list-fonts   "Lucida Grande")   '(:font   "Lucida Grande"))
+  ;;               ((x-list-fonts   "Verdana")         '(:font   "Verdana"))
+  ;;               ((x-family-fonts "Sans Serif")      '(:family "Sans Serif"))
+  ;;               (nil (warn "Cannot find a Sans Serif Font."))))
+  ;;        (base-font-color (face-foreground 'default nil 'default))
+  ;;        (headline `(:inherit default :weight bold
+  ;;                    :foreground ,base-font-color)))
+
+  ;;   (custom-theme-set-faces
+  ;;    'user
+  ;;    `(org-level-8        ((t (,@headline ,@variable-tuple))))
+  ;; 		`(org-level-7        ((t (,@headline ,@variable-tuple))))
+  ;;    `(org-level-6        ((t (,@headline ,@variable-tuple))))
+  ;;    `(org-level-5        ((t (,@headline ,@variable-tuple))))
+  ;;    `(org-level-4        ((t (,@headline ,@variable-tuple :height 1.1))))
+  ;;    `(org-level-3        ((t (,@headline ,@variable-tuple :height 1.25))))
+  ;;    `(org-level-2        ((t (,@headline ,@variable-tuple :height 1.5))))
+  ;;    `(org-level-1        ((t (,@headline ,@variable-tuple :height 1.75))))
+  ;;    `(org-headline-done  ((t (,@headline ,@variable-tuple :strike-through t))))
+  ;;    `(org-document-title ((t (,@headline ,@variable-tuple
+  ;;                                         :height 2.0 :underline nil))))))
+#+end_src
+
+*** Fonts and wrapping
+
+I use proportional fonts in org-mode for the text, while keeping fixed-width fonts for blocks, so that source code, tables, etc. are shown correctly. These settings include:
+
+**** Nerd Icons
+
+Nerd Icons helps.
+
+  #+begin_src emacs-lisp
+    ;; (use-package nerd-icons
+    ;;   :ensure t)
+  #+end_src
+
+  - Setting up the =variable-pitch= face to the proportional font I like to use. My current favorite is [[https://edwardtufte.github.io/et-book/][ET Book]], in the past I have used [[https://en.wikipedia.org/wiki/Source_Sans_Pro][Source Sans Pro]] and [[https://en.wikipedia.org/wiki/Avenir_(typeface)][Avenir Next]].
+    ,#+begin_src emacs-lisp :tangle no :noweb-ref org-mode-faces
+      (variable-pitch ((t (:family "CaskaydiaCove NF" :height 100))))
+      ;;(variable-pitch ((t (:family "Avenir Next" :height 160 :weight light))))
+  #+end_src
+
+- Setting up the =fixed-pitch= face to be the same as my usual =default= face. My current one is +[[https://en.wikipedia.org/wiki/Inconsolata][Inconsolata]]+ CaskaydiaCove
+  #+begin_src emacs-lisp :tangle no :noweb-ref org-mode-faces
+    ;;    (fixed-pitch ((t (:family "Inconsolata Nerd Font"))))
+    (fixed-pitch ((t (:family "CaskaydiaCove NF" :height 100))))
+    (variable-pitch ((t (:family "CaskaydiaCove NF" :height 100))))
+  #+end_src
+
+- Configure =org-indent= to inherit from =fixed-pitch= to fix the vertical spacing in code blocks. Thanks to Ben for the tip!
+  #+begin_src emacs-lisp :tangle no :noweb-ref org-mode-faces
+    (org-indent ((t (:inherit (org-hide fixed-pitch)))))
+  #+end_src
+
+- Configure =org-fontify-done-headline= to apply a special face to DONE items in org-mode, and configure the =org-done= face to be used.  Note that  =org-done= only applies to the "DONE" keyword itself, the face for the rest of a "done" headline is defined above as the =org-headline-done= face.
+
+  #+begin_src emacs-lisp :tangle no :noweb-ref org-mode-custom-vars
+    (org-fontify-done-headline t)
+  #+end_src
+
+  #+begin_src emacs-lisp :tangle no :noweb-ref org-mode-faces
+    (org-done ((t (:foreground "PaleGreen"
+    			   :strike-through t))))
+  #+end_src
+
+- Configuring the corresponding =org-mode= faces for blocks, verbatim code, and maybe a couple of other things. As these change more frequently, I do them directly from the =customize-face= interface, you can see their current settings in the [[*Customized variables][Customized variables]] section.
+
+- Setting up =visual-line-mode= and making all my paragraphs one single line, so that the lines wrap around nicely in the window according to their proportional-font size, instead of at a fixed character count, which does not work so nicely when characters have varying widths. I set up a hook that automatically enables =visual-line-mode= and =variable-pitch-mode= when entering org-mode.
+  #+begin_src emacs-lisp :tangle no :noweb-ref org-mode-hooks
+    (org-mode . visual-line-mode)
+    (org-mode . variable-pitch-mode)
+  #+end_src
+
+  Turns out =visual-line-mode= also remaps the ~C-a~ and ~C-e~ keybindings (of course, which breaks the behavior enabled by the =org-special-ctrl-a/e/k= variables. To counter this, I also add some bindings that set those keys to their Org functions. These functions know how to deal with visual mode anyway.
+
+  #+begin_src emacs-lisp :tangle no :noweb-ref org-mode-keybindings
+    ("C-a" . org-beginning-of-line)
+    ("C-e" . org-end-of-line)
+    ("C-k" . org-kill-line)
+  #+end_src
+
+- In =variable-pitch= mode, the default right-alignment for headline tags doesn't work, and results in the tags being misaligned (as it uses character positions to do the alignment). This setting positions the tags right after the last character of the headline, so at least they are more consistent.
+
+  #+begin_src emacs-lisp :tangle no :noweb-ref org-mode-custom-vars
+    (org-tags-column 0)
+  #+end_src
+
+- I also set =org-todo-keyword-faces= to highlight different  types of org-mode TODO items with different colors.
+
+  #+begin_src emacs-lisp :tangle no :noweb-ref org-mode-custom-vars
+    (org-todo-keyword-faces
+     '(("AREA"         . "DarkOrchid1")
+       ("[AREA]"       . "DarkOrchid1")
+       ("PROJECT"      . "DarkOrchid1")
+       ("[PROJECT]"    . "DarkOrchid1")
+       ("INBOX"        . "cyan")
+       ("[INBOX]"      . "cyan")
+       ("PROPOSAL"     . "orange")
+       ("[PROPOSAL]"   . "orange")
+       ("DRAFT"        . "yellow3")
+       ("[DRAFT]"      . "yellow3")
+       ("INPROGRESS"   . "yellow4")
+    		("[INPROGRESS]" . "yellow4")
+       ("MEETING"      . "purple")
+       ("[MEETING]"    . "purple")
+       ("CANCELED"     . "blue")
+       ("[CANCELED]"   . "blue")))
+  #+end_src
+
+  These two modes produce modeline indicators, which I disable using =diminish=.
+
+  #+begin_src emacs-lisp :tangle no :noweb-ref org-mode-config
+    ;;(eval-after-load 'face-remap '(diminish 'buffer-face-mode))
+    ;;(eval-after-load 'simple '(diminish 'visual-line-mode))
+  #+end_src
+
+*** "Focused Writing" mode
+
+I'm experimenting with some settings based on [[https://lepisma.xyz/2017/10/28/ricing-org-mode/][Ricing up Org Mode]], particularly for using when writing, to avoid distractions. For now these are contained within a function that I can call to enable them, to give me a chance to experiment.
+
+#+begin_src emacs-lisp
+  (defun zz/write ()
+    (interactive)
+    ;; Line spacing
+    (setq line-spacing 0.1)
+    ;; Top padding
+    (setq header-line-format " ")
+    ;; Hide modeline
+    (hide-mode-line-mode)
+    ;;(setq mode-line-format nil)
+    ;; Side padding
+    (setq left-margin-width 2)
+    (setq right-margin-width 2)
+    (set-window-buffer nil (current-buffer)))
+#+end_src
+
+The function above uses [[https://github.com/hlissner/emacs-hide-mode-line][hide-mode-line]] mode.
+
+#+begin_src emacs-lisp
+  (use-package hide-mode-line
+    :ensure t)
+#+end_src
+
+*** Source code blocks
+
+The following code ([[https://pank.eu/blog/pretty-babel-src-blocks.html][by Rasmus]]) prettifies org-mode's source blocks by replacing the =#+begin/end_src= keywords and the header arguments with symbols. In my config, the following code:
+
+#+begin_src emacs-lisp :tangle no
+  (defvar zzamboni/test-symbol ?✎
+    "This is a test symbol")
+#+end_src
+
+Looks like this:
+
+#+DOWNLOADED: screenshot @ 2020-03-17 09:54:28
+#+attr_org: :width 500
+[[file:images/my-emacs-configuration-with-commentary/2020-03-17_09-54-28_screenshot.png]]
+
+When the cursor is over or next to one of the symbols, it gets expanded into its text representation to make editing easier. This is enabled by setting =prettify-symbols-unprettify-at-point= to ='right-edge=:
+
+#+DOWNLOADED: screenshot @ 2020-03-17 10:22:49
+#+attr_org: :width 500
+[[file:images/my-emacs-configuration-with-commentary/2020-03-17_10-22-49_screenshot.png]]
+
+#+begin_src emacs-lisp
+  (with-eval-after-load 'org
+    (defvar-local rasmus/org-at-src-begin -1
+      "Variable that holds whether last position was a ")
+
+    (defvar rasmus/ob-header-symbol ?☰
+      "Symbol used for babel headers")
+
+    (defun rasmus/org-prettify-src--update ()
+      (let ((case-fold-search t)
+             (re "^[ \t]*#\\+begin_src[ \t]+[^ \f\t\n\r\v]+[ \t]*")
+             found)
+        (save-excursion
+          (goto-char (point-min))
+          (while (re-search-forward re nil t)
+            (goto-char (match-end 0))
+            (let ((args (org-trim
+  												(buffer-substring-no-properties (point)
+                            (line-end-position)))))
+              (when (org-string-nw-p args)
+                (let ((new-cell (cons args rasmus/ob-header-symbol)))
+                  (cl-pushnew new-cell prettify-symbols-alist :test #'equal)
+                  (cl-pushnew new-cell found :test #'equal)))))
+          (setq prettify-symbols-alist
+            (cl-set-difference prettify-symbols-alist
+              (cl-set-difference
+                (cl-remove-if-not
+                  (lambda (elm)
+                    (eq (cdr elm) rasmus/ob-header-symbol))
+                  prettify-symbols-alist)
+                found :test #'equal)))
+          ;; Clean up old font-lock-keywords.
+          (font-lock-remove-keywords nil prettify-symbols--keywords)
+          (setq prettify-symbols--keywords (prettify-symbols--make-keywords))
+          (font-lock-add-keywords nil prettify-symbols--keywords)
+          (while (re-search-forward re nil t)
+            (font-lock-flush (line-beginning-position) (line-end-position))))))
+
+    (defun rasmus/org-prettify-src ()
+      "Hide src options via `prettify-symbols-mode'.
+
+          `prettify-symbols-mode' is used because it has uncollpasing. It's
+          may not be efficient."
+      (let* ((case-fold-search t)
+  						(at-src-block (save-excursion
+  														(beginning-of-line)
+  														(looking-at "^[ \t]*#\\+begin_src[ \t]+[^ \f\t\n\r\v]+[ \t]*"))))
+        ;; Test if we moved out of a block.
+        (when (or (and rasmus/org-at-src-begin
+                    (not at-src-block))
+                ;; File was just opened.
+                (eq rasmus/org-at-src-begin -1))
+          (rasmus/org-prettify-src--update))
+        ;; Remove composition if at line; doesn't work properly.
+        ;; (when at-src-block
+        ;;   (with-silent-modifications
+        ;;     (remove-text-properties (match-end 0)
+        ;;                             (1+ (line-end-position))
+        ;;                             '(composition))))
+        (setq rasmus/org-at-src-begin at-src-block)))
+
+    ;; This function helps to produce a single glyph out of a
+    ;; string. The glyph can then be used in prettify-symbols-alist.
+    ;; This function was provided by Ihor in the org-mode mailing list.
+    (defun yant/str-to-glyph (str)
+      "Transform string into glyph, displayed correctly."
+      (let ((composition nil))
+        (dolist (char (string-to-list str)
+                  (nreverse (cdr composition)))
+          (push char composition)
+          (push '(Br . Bl) composition))))
+
+    (defun rasmus/org-prettify-symbols ()
+      (mapc (apply-partially 'add-to-list 'prettify-symbols-alist)
+        (cl-reduce 'append
+          (mapcar (lambda (x) (list x (cons (upcase (car x)) (cdr x))))
+            `(("#+begin_src" . ?⎡) ;; ⎡ ➤ 🖝 ➟ ➤ ✎
+               ;; multi-character strings can be used with something like this:
+               ;; ("#+begin_src" . ,(yant/str-to-glyph "```"))
+               ("#+end_src"   . ?⎣) ;; ⎣ ✐
+               ("#+header:" . ,rasmus/ob-header-symbol)
+               ("#+begin_quote" . ?«)
+               ("#+end_quote" . ?»)))))
+      (turn-on-prettify-symbols-mode)
+      (add-hook 'post-command-hook 'rasmus/org-prettify-src t t))
+    (add-hook 'org-mode-hook #'rasmus/org-prettify-symbols))
+#+end_src
+** Auto-generated table of contents
+
+The =toc-org= package allows us to insert a table of contents in headings marked with =:TOC:=. This is useful for org files that are to be viewed directly on GitHub, which renders org files correctly, but does not generate a table of contents at the top. For an example, see [[https://github.com/zzamboni/dot-emacs/blob/master/init.org][this file on GitHub]].
+
+Note that this breaks HTML export by default, as the links generated by =toc-org= cannot be parsed properly by the html exporter. The [[https://github.com/snosov1/toc-org/issues/35#issuecomment-275096511][workaround]] is to use =:TOC:noexport:= as the marker, which removed the generated TOC from the export, but still allows =ox-html= to insert its own TOC at the top.
+
+#+begin_src emacs-lisp
+  (use-package toc-org
+    :after org
+    :hook
+    (org-mode . toc-org-enable))
+#+end_src
+
+** Grabbing links from different Mac applications
+
+=org-mac-link= (included in contrib) implements the ability to grab links from different Mac apps and insert them in the file. Bind =C-c g= to call =org-mac-grab-link= to choose an application and insert a link.
+
+#+begin_src emacs-lisp
+  (use-package org-mac-link
+    :ensure nil
+    :load-path "lisp/org-mode/contrib/lisp"
+    :after org
+    :custom
+    (org-mac-grab-Acrobat-app-p nil "Disable grabbing from Adobe Acrobat")
+    (org-mac-grab-devonthink-app-p nil "Disable grabbinb from DevonThink")
+    :bind
+    (:map org-mode-map
+     ("C-c g" . org-mac-grab-link)))
+#+end_src
+
+** Reformatting an Org buffer
+
+I picked up this little gem in the org mailing list. A function that reformats the current buffer by regenerating the text from its internal parsed representation. Quite amazing.
+
+#+begin_src emacs-lisp
+  (defun zz/org-reformat-buffer ()
+    (interactive)
+    (when (y-or-n-p "Really format current buffer? ")
+      (let ((document (org-element-interpret-data (org-element-parse-buffer))))
+        (erase-buffer)
+        (insert document)
+        (goto-char (point-min)))))
+#+end_src
+
+Remove a link. For some reason this is not part of org-mode. From https://emacs.stackexchange.com/a/10714/11843, I bind it to ~C-c~ ~C-M-u~.
+
+#+begin_src emacs-lisp
+  (defun afs/org-remove-link ()
+    "Replace an org link by its description or if empty its address"
+    (interactive)
+    (if (org-in-regexp org-bracket-link-regexp 1)
+        (let ((remove (list (match-beginning 0) (match-end 0)))
+              (description (if (match-end 3)
+                               (org-match-string-no-properties 3)
+                             (org-match-string-no-properties 1))))
+          (apply 'delete-region remove)
+          (insert description))))
+  (bind-key "C-c C-M-u" 'afs/org-remove-link)
+#+end_src
+
+** Code for org-mode macros
+
+Here I define functions which get used in some of my org-mode macros
+
+The first is a support function which gets used in some of the following, to return a string (or an optional custom  string) only if  it  is a non-zero, non-whitespace string,  and =nil= otherwise.
+
+#+begin_src emacs-lisp
+  (defun zz/org-if-str (str &optional desc)
+    (when (org-string-nw-p str)
+      (or (org-string-nw-p desc) str)))
+#+end_src
+
+This function receives three arguments, and returns the org-mode code for a link to the Hammerspoon API documentation for the =link= module, optionally to a specific =function=. If =desc= is passed, it is used as the display text, otherwise =section.function= is used.
+
+#+begin_src emacs-lisp
+  (defun zz/org-macro-hsapi-code (module &optional func desc)
+    (org-link-make-string
+     (concat "https://www.hammerspoon.org/docs/"
+             (concat module (zz/org-if-str func (concat "#" func))))
+     (or (org-string-nw-p desc)
+       (format "=%s="
+                 (concat module
+                         (zz/org-if-str func (concat "." func)))))))
+#+end_src
+
+Split STR at spaces and wrap each element with the =~= char, separated by =+=. Zero-width spaces are inserted around the plus signs so that they get formatted correctly. Envisioned use is for formatting keybinding descriptions. There are two versions of this function: "outer" wraps each element in  =~=, the "inner" wraps the whole sequence in them.
+
+#+begin_src emacs-lisp
+  (defun zz/org-macro-keys-code-outer (str)
+    (mapconcat (lambda (s)
+                 (concat "~" s "~"))
+               (split-string str)
+               (concat (string ?\u200B) "+" (string ?\u200B))))
+  (defun zz/org-macro-keys-code-inner (str)
+    (concat "~" (mapconcat (lambda (s)
+                             (concat s))
+                           (split-string str)
+                           (concat (string ?\u200B) "-" (string ?\u200B)))
+            "~"))
+  (defun zz/org-macro-keys-code (str)
+    (zz/org-macro-keys-code-inner str))
+#+end_src
+
+Links to a specific section/function of the Lua manual.
+
+#+begin_src emacs-lisp
+  (defun zz/org-macro-luadoc-code (func &optional section desc)
+    (org-link-make-string
+     (concat "https://www.lua.org/manual/5.3/manual.html#"
+       (zz/org-if-str func section))
+     (zz/org-if-str func desc)))
+#+end_src
+
+#+begin_src emacs-lisp
+  (defun zz/org-macro-luafun-code (func &optional desc)
+    (org-link-make-string
+  		(concat "https://www.lua.org/manual/5.3/manual.html#"
+             (concat "pdf-" func))
+     (zz/org-if-str (concat "=" func "()=") desc)))
+#+end_src
+
+** Publishing project configuration
+
+Define a publishing function based on =org-latex-publish-to-pdf= but which opens the resulting file at the end.
+
+#+begin_src emacs-lisp
+  (defun org-latex-publish-to-latex-and-open (plist file pub-dir)
+    (org-open-file (org-latex-publish-to-pdf plist file pub-dir)))
+#+end_src
+
+Sample project configuration - disabled for now because this configuration has been incorporated into the =structure.tex= file and in the general =ox-latex= configuration, but kept here as a sample.
+
+#+begin_src emacs-lisp :tangle no :noweb-ref none
+  (org-publish-project-alist
+   '(("mac-automation"
+      :base-directory "~/Personal/writing/mac-automation/"
+      :publishing-directory "~/Personal/writing/mac-automation/build/"
+      :base-extension "org"
+      :publishing-function org-latex-publish-to-latex-and-open
+      :latex-compiler "xelatex"
+      :latex-classes '("book-no-parts" "\\documentclass[11pt]{book}"
+                       ("\\chapter{%s}" . "\\chapter*{%s}")
+                       ("\\section{%s}" . "\\section*{%s}")
+                       ("\\subsection{%s}" . "\\subsection*{%s}")
+                       ("\\subsubsection{%s}" . "\\subsubsection*{%s}")
+                       ("\\paragraph{%s}" . "\\paragraph*{%s}"))
+      :latex-class "book-no-parts"
+      :latex-title-command "\\makeatletter\\begingroup
+      \\thispagestyle{empty}
+      \\begin{tikzpicture}[remember picture,overlay]
+      \\node[inner sep=0pt] (background) at (current page.center) {\\includegraphics[width=\\paperwidth]{background}};
+      \\draw (current page.center) node [fill=ocre!30!white,fill opacity=0.6,text opacity=1,inner sep=1cm]{\\Huge\\centering\\bfseries\\sffamily\\parbox[c][][t]{\\paperwidth}{\\centering \\@title \\\\[15pt]
+      {\\Large \\@subtitle }\\\\[20pt]
+      {\\huge \\@author }}};
+      \\end{tikzpicture}
+      \\vfill
+      \\endgroup\\makeatother
+      \\chapterimage{chapter_head_1.pdf}"
+      :latex-toc-command "\\pagestyle{empty}
+    \\tableofcontents
+    \\cleardoublepage
+    \\pagestyle{fancy}"
+      )))
+#+end_src
+
+** Publishing to LeanPub
+
+I use [[https://leanpub.com/][LeanPub]] for self-publishing [[https://leanpub.com/u/zzamboni][my books]]. Fortunately, it is possible to export from org-mode to both [[https://leanpub.com/lfm/read][LeanPub-flavored Markdown]] and [[https://leanpub.com/markua/read][Markua]], the new preferred Leanpub markup format, so I can use Org for writing the text and simply export it in the correct format and structure needed by Leanpub.
+
+When I decided to use org-mode to write my books, I looked around for existing modules and code. Here are some of the resources I found:
+- [[http://juanreyero.com/open/ox-leanpub/index.html][Description of ox-leanpub.el]] ([[https://github.com/juanre/ox-leanpub][GitHub repo]]) by [[http://juanreyero.com/about/][Juan Reyero]];
+- [[https://medium.com/@lakshminp/publishing-a-book-using-org-mode-9e817a56d144][Publishing a book using org-mode]] by [[https://medium.com/@lakshminp/publishing-a-book-using-org-mode-9e817a56d144][Lakshmi Narasimhan]];
+- [[http://irreal.org/blog/?p=5313][Publishing a Book with Leanpub and Org Mode]] by Jon Snader (from where I found the links to the above).
+
+Building upon these, I have developed a new =ox-leanpub= package which you can find in MELPA (source at [[https://github.com/zzamboni/ox-leanpub]]), and which I load and configure below.
+
+The =ox-leanpub= module sets up Markua export automatically, and I add the code for setting up the Markdown exporter too (I don't use it, but just to keep an eye on any breakage):
+
+#+begin_src emacs-lisp
+  (use-package ox-leanpub
+    :defer 1
+    :after org
+    :config
+    (require 'ox-leanpub-markdown)
+    (org-leanpub-book-setup-menu-markdown))
+#+end_src
+
+I highly recommend using Markua rather than Markdown, as it is the future that Leanpub is guaranteed to support in the future, and where most of the new features are being developed.
+
+With this setup, I can write my book in org-mode (I usually keep a single =book.org= file at the top of my repository), and then call the corresponding "Book" export commands. The =manuscript= directory, as well as the corresponding =Book.txt= and other necessary files are created and populated automatically.
+
+** Miscellaneous org functions and configuration
+
+Utility =org-get-keyword= function (from the org-mode mailing list) to get the value of file-level properties.
+
+#+begin_src emacs-lisp
+  (defun org-get-keyword (key)
+    (org-element-map (org-element-parse-buffer 'element) 'keyword
+      (lambda (k)
+        (when (string= key (org-element-property :key k))
+          (org-element-property :value k)))
+      nil t))
+#+end_src
+
+[[https://github.com/alphapapa/org-sidebar][org-sidebar]] provides a configurable sidebar  to org buffers, showing the agenda, headlines, etc.
+
+#+begin_src emacs-lisp
+  (use-package org-sidebar
+    :ensure t)
+#+end_src
+
+
+* Cheatsheet and experiments
+
+Playground and how to do different things, not necessarily used in my Emacs config but useful sometimes.
+
+Export an org file to separate per-top-header markdown files. Based on https://medium.com/@lakshminp/publishing-a-book-using-org-mode-9e817a56d144. This code is kept separately at https://gist.github.com/zzamboni/2e6ac3c4f577249d98efb224d9d34488.
+
+#+begin_src emacs-lisp
+  ;; Call this function with "M-x org-multi-file-md-export"
+  (defun org-multi-file-md-export ()
+    "Export current buffer to multiple Markdown files."
+    (interactive)
+    ;; Loop over all entries in the file
+    (org-map-entries
+     (lambda ()
+       (let* ((level (nth 1 (org-heading-components)))
+              (title (or (nth 4 (org-heading-components)) ""))
+              ;; Export filename is the EXPORT_FILE_NAME property, or the
+              ;; lower-cased section title if it's not set.
+              (filename
+  							(or (org-entry-get (point) "EXPORT_FILE_NAME")
+                   (concat (replace-regexp-in-string " " "-" (downcase title)) ".md"))))
+         (when (= level 1) ;; export only first level entries
+           ;; Mark the subtree so that the title also gets exported
+           (org-mark-subtree)
+           ;; Call the export function. This is one of the base org
+           ;; functions, the 'md defines the backend to use for the
+           ;; conversion. For exporting to other formats, simply use the
+           ;; correct backend name, and also change the file extension
+           ;; above.
+           (org-export-to-file 'md filename nil t nil))))
+     ;; skip headlines tagged with "noexport" (this is an argument to
+     ;; org-map-entries above)
+     "-noexport")
+    nil nil)
+#+end_src
+
+This is how we get a global header property in org-mode
+
+#+begin_src emacs-lisp :tangle no
+  (alist-get :tangle
+             (org-babel-parse-header-arguments
+              (org-entry-get-with-inheritance "header-args")))
+#+end_src
+
+Testing formatting org snippets to look like noweb-rendered output (disabled for now).
+
+#+begin_src emacs-lisp :tangle no
+  (eval-after-load 'ob
+    (customize-set-variable
+     'org-entities-user
+     '(("llangle" "\\llangle" t "&lang;&lang;" "<<" "<<" "«")
+       ("rrangle" "\\rrangle" t "&rang;&rang;" ">>" ">>" "»")))
+    (setq org-babel-exp-code-template
+      (concat "\n@@latex:\\noindent@@\\llangle​/%name/​\\rrangle\\equiv\n"
+                  org-babel-exp-code-template)))
+#+end_src
+
+An experiment to reduce file tangle time, from https://www.wisdomandwonder.com/article/10630/how-fast-can-you-tangle-in-org-mode. In my tests it doesn't have a noticeable impact.
+
+#+begin_src emacs-lisp :tangle no
+(setq help/default-gc-cons-threshold gc-cons-threshold)
+(defun help/set-gc-cons-threshold (&optional multiplier notify)
+  "Set `gc-cons-threshold' either to its default value or a
+     `multiplier' thereof."
+  (let* ((new-multiplier (or multiplier 1))
+         (new-threshold (* help/default-gc-cons-threshold
+                           new-multiplier)))
+    (setq gc-cons-threshold new-threshold)
+    (when notify (message "Setting `gc-cons-threshold' to %s"
+                          new-threshold))))
+(defun help/double-gc-cons-threshold () "Double `gc-cons-threshold'." (help/set-gc-cons-threshold 10))
+(add-hook 'org-babel-pre-tangle-hook #'help/double-gc-cons-threshold)
+(add-hook 'org-babel-post-tangle-hook #'help/set-gc-cons-threshold)
+#+end_src
+
+A work-in-progress Hammerspoon shell for Emacs, posted on the Hammerspoon mailing list.
+
+#+begin_src emacs-lisp :tangle no
+  ;;===> hammerspoon-shell
+  ;; Quick and dirty shell with interactive history search and persistence
+  ;; Just drop into your ~/.emacs file.
+  ;;
+  ;; A hammerspoon buffer is any lua buffer visiting a pathname like
+  ;;    **/*hammerspoon**/*.lua
+  ;; Usage: M-x hammerspoon-shell, or Hyper-s in a hammerspoon buffer.
+  ;; In any hammerspoon buffer, Hyper-c runs dofile(file) on the visited file.
+  ;;
+  ;; Tip: to reload a Spoon "MySpoon" without hs.reload:
+  ;; package.loaded.MySpoon=false hs.spoons.use("MySpoon",{config={debug=true})
+  (add-hook 'lua-mode-hook
+            (lambda ()
+              (when (string-match "hammerspoon" buffer-file-name)
+                (local-set-key (kbd "H-s") #'hammerspoon-shell)
+                (local-set-key
+                 (kbd "H-c")
+                 (lambda ()
+                   (interactive)
+                   (save-buffer)
+                   (let ((name buffer-file-name))
+                     (unless (and (boundp 'hammerspoon-buffer)
+                                  (buffer-live-p hammerspoon-buffer))
+                       (hammerspoon-shell))
+                     (with-current-buffer hammerspoon-buffer
+                       (goto-char (point-max))
+                       (insert (concat "dofile(\"" name "\")"))
+                       (comint-send-input))))))))
+
+  (defvar hammerspoon-buffer nil)
+  (defun hammerspoon-shell ()
+    (interactive)
+    (if (and hammerspoon-buffer (comint-check-proc hammerspoon-buffer))
+        (pop-to-buffer hammerspoon-buffer)
+      (setq hammerspoon-buffer (make-comint "hammerspoon"
+                                            "/usr/local/bin/hs" nil "-C"))
+      (let* ((process (get-buffer-process hammerspoon-buffer))
+             (history-file "~/.hammerspoon/.hs-history"))
+        (pop-to-buffer hammerspoon-buffer)
+        (turn-on-comint-history history-file)
+        (local-set-key (kbd "<down>") (lambda() (interactive)
+                                        (comint-move-or-history nil)))
+        (local-set-key (kbd "<up>") (lambda() (interactive)
+                                      (comint-move-or-history 'up))))))
+
+  ;; Comint configs and extensions
+  (setq comint-input-ring-size 1024
+        comint-history-isearch 'dwim)
+  (defun comint-move-or-history (up &optional arg)
+    "History if at process mark, move otherwise"
+    (interactive)
+    (let* ((proc (get-buffer-process (current-buffer)))
+           (proc-pos (if proc (marker-position (process-mark proc))))
+           (arg (or arg 1))
+           (arg (if up arg (- arg))))
+      (if (and proc
+               (if up
+                   (= (line-number-at-pos) (line-number-at-pos proc-pos))
+                 (= (line-number-at-pos) (line-number-at-pos (point-max)))))
+          (comint-previous-input arg)
+        (forward-line (- arg)))))
+
+  (defun comint-write-history-on-exit (process event)
+    (comint-write-input-ring)
+    (let ((buf (process-buffer process)))
+      (when (buffer-live-p buf)
+        (with-current-buffer buf
+          (insert (format "\nProcess %s %s" process event))))))
+
+  (defun turn-on-comint-history (&optional file)
+    (let ((process (get-buffer-process (current-buffer))))
+      (when process
+        (setq comint-input-ring-file-name
+              (or file
+                  (format "~/.emacs.d/inferior-%s-history"
+                          (process-name process))))
+        (comint-read-input-ring)
+        ;; Ensure input ring gets written
+        (add-hook 'kill-buffer-hook 'comint-write-input-ring nil t)
+        (set-process-sentinel process
+                              #'comint-write-history-on-exit))))
+
+  ;; Ensure all input rings get written on exit
+  (defun comint-write-input-ring-all-buffers ()
+    (mapc (lambda (buffer)
+            (with-current-buffer buffer
+              (comint-write-input-ring)))
+          (buffer-list)))
+  (add-hook 'kill-emacs-hook 'comint-write-input-ring-all-buffers)
+#+end_src
+
+* Epilogue
+
+Here we close the =let= expression from [[*Performance optimization][the preface]].
+
+#+begin_src emacs-lisp
+(setq gc-cons-threshold (* 2 1000 1000))
+)
+#+end_src
