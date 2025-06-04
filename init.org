@@ -91,7 +91,6 @@ We set some configuration for =use-package=:
 
   (require 'use-package)
   (setq use-package-always-ensure t)
-  (custom-set-variables '(use-package-always-defer t))
   (custom-set-variables '(use-package-verbose nil))
 #+end_src
 
@@ -100,7 +99,6 @@ Giving a try to [[https://github.com/Malabarba/paradox][Paradox]] for an enhance
 #+begin_src emacs-lisp
 (use-package paradox
   :ensure t
-  :defer nil
   :custom
   (paradox-github-token t)
   :config
@@ -114,11 +112,11 @@ This variable tells Emacs to prefer the =.el= file if it's newer, even if there 
 #+begin_src emacs-lisp
   (custom-set-variables '(load-prefer-newer t))
 
-  (require 'custom)
+  (setq custom-file "~/.emacs.d/custom.el")
+  (load custom-file)
 
   (use-package auto-compile
     :ensure t
-    :defer nil
     :config (auto-compile-on-load-mode))
 #+end_src
 
@@ -200,8 +198,10 @@ These are two short functions I wrote to be able to set/unset proxy settings wit
 
 - Show line numbers. I used =linum-mode= before, but it caused severe performance issues on large files. Emacs 26 introduces =display-line-numbers-mode=, which has no perceivable performance impact even on very large files. Disabled for now.
 
-  #+begin_src emacs-lisp :tangle no
-    ((global-display-line-numbers-mode 1))
+  #+begin_src emacs-lisp
+    (add-hook 'prog-mode-hook #'display-line-numbers-mode)
+    (add-hook 'org-mode-hook #'display-line-numbers-mode)
+    (add-hook 'text-mode-hook #'display-line-numbers-mode)
   #+end_src
 
 - Highlight trailing whitespace in red, so it's easily visible (disabled  for now as it created a lot of noise in some modes, e.g. the org-mode export screen)
@@ -213,7 +213,7 @@ These are two short functions I wrote to be able to set/unset proxy settings wit
 - Highlight matching parenthesis
 
   #+begin_src emacs-lisp
-    (show-paren-mode)
+    ;; (show-paren-mode)
   #+end_src
 
 - Don't use hard tabs
@@ -249,7 +249,6 @@ These are two short functions I wrote to be able to set/unset proxy settings wit
 
   #+begin_src emacs-lisp
     (use-package saveplace
-      :defer nil
       :config
       (save-place-mode))
   #+end_src
@@ -328,7 +327,6 @@ The [[https://github.com/justbur/emacs-which-key][which-key]] package makes Emac
 
 #+begin_src emacs-lisp
 (use-package which-key
-  :defer nil
   :diminish which-key-mode
   :config
   (which-key-mode))
@@ -461,134 +459,21 @@ You'll notice that many of the packages in this section have =:defer nil=. This 
   (add-to-list 'default-frame-alist
                '(font . "CaskaydiaCove NF 10"))
 
-  (set-face-attribute 'default nil :font "CaskaydiaCove NF" :height 10)
-  (set-face-attribute 'fixed-pitch nil :font "CaskaydiaCove NF" :height 10)
-  (set-face-attribute 'variable-pitch nil :font "CaskaydiaCove NF" :height 10)
+  (set-face-attribute 'default nil :font "CaskaydiaCove NF" :height 95)
+  (set-face-attribute 'fixed-pitch nil :font "CaskaydiaCove NF" :height 95)
+  (set-face-attribute 'variable-pitch nil :font "CaskaydiaCove NF" :height 95)
 #+end_src
 
 ** Pixel Scrolling
 
 #+begin_src emacs-lisp
-(when (>= emacs-major-version 26)
-  (pixel-scroll-mode))
+  (pixel-scroll-mode 1)
 #+end_src
 
 ** Dashboard
 
-#+begin_src emacs-lisp
-  (use-package dashboard
-    :ensure t
-    :config
-    (dashboard-setup-startup-hook))
+Currently not needed.
 
-  ;; Set the title
-  (setq dashboard-banner-logo-title "Welcome to Emacs Dashboard")
-  ;; Set the banner
-  (setq dashboard-startup-banner [VALUE])
-  ;; Value can be:
-  ;;  - 'official which displays the official emacs logo.
-  ;;  - 'logo which displays an alternative emacs logo.
-  ;;  - an integer which displays one of the text banners
-  ;;    (see dashboard-banners-directory files).
-  ;;  - a string that specifies a path for a custom banner
-  ;;    currently supported types are gif/image/text/xbm.
-  ;;  - a cons of 2 strings which specifies the path of an image to use
-  ;;    and other path of a text file to use if image isn't supported.
-  ;;    (cons "path/to/image/file/image.png" "path/to/text/file/text.txt").
-  ;;  - a list that can display an random banner,
-  ;;    supported values are: string (filepath), 'official, 'logo and integers.
-
-  ;; Content is not centered by default. To center, set
-  (setq dashboard-center-content t)
-  ;; vertically center content
-  (setq dashboard-vertically-center-content t)
-
-  ;; To disable shortcut "jump" indicators for each section, set
-  (setq dashboard-show-shortcuts nil)
-
-  (setq dashboard-items '((recents   . 5)
-    			(bookmarks . 5)
-    			(projects  . 5)
-    			(agenda    . 5)
-    			(registers . 5)))
-  ;; To customize which widgets to display in order (example: Banner, footer message …):
-  (setq dashboard-startupify-list '(dashboard-insert-banner
-                                    dashboard-insert-newline
-                                    dashboard-insert-banner-title
-                                    dashboard-insert-newline
-                                    dashboard-insert-navigator
-                                    dashboard-insert-newline
-                                    dashboard-insert-init-info
-                                    dashboard-insert-items
-                                    dashboard-insert-newline
-                                    dashboard-insert-footer))
-  ;; To enable cycle navigation between each section:
-  (setq dashboard-navigation-cycle t)
-
-  ;; To customize string format in shortcuts:
-  (setq dashboard-heading-shorcut-format " [%s]")
-
-  ;; To customize item shortcuts:
-  (setq dashboard-item-shortcuts '((recents   . "r")
-  				 (bookmarks . "m")
-  				 (projects  . "p")
-  				 (agenda    . "a")
-  				 (registers . "e")))
-
-  (setq dashboard-item-names '(("Recent Files:"               . "Recently opened files:")
-  			     ("Agenda for today:"           . "Today's agenda:")
-  			     ("Agenda for the coming week:" . "Agenda:")))
-
-  ;; To use all-the-icons package:
-  (setq dashboard-icon-type 'all-the-icons)  ; use `all-the-icons' package
-
-  ;; To use nerd-icons package:
-  (setq dashboard-display-icons-p t)     ; display icons on both GUI and terminal
-  (setq dashboard-icon-type 'nerd-icons) ; use `nerd-icons' package
-
-  ;; To add icons to the widget headings and their items:
-  (setq dashboard-set-heading-icons t)
-  (setq dashboard-set-file-icons t)
-
-  ;; ;; To modify heading icons with another icon from all-the-icons octicons:
-  ;; (dashboard-modify-heading-icons '((recents   . "file-text")
-  ;;                                 (bookmarks . "book")))
-
-  ;; To modify the icon height or vertical adjust:
-  (setq dashboard-icon-file-height 1.75)
-  (setq dashboard-icon-file-v-adjust -0.125)
-  (setq dashboard-heading-icon-height 1.75)
-  (setq dashboard-heading-icon-v-adjust -0.125)
-
-  ;; To use it with counsel-projectile or persp-projectile
-  (setq dashboard-projects-switch-function 'counsel-projectile-switch-project-by-name)
-
-  ;; To display today’s agenda items on the dashboard, add agenda to dashboard-items:
-  (add-to-list 'dashboard-items '(agenda) t)
-
-  ;; To show agenda for the upcoming seven days set the variable dashboard-week-agenda to t.
-  (setq dashboard-week-agenda t)
-
-  ;; By default org-agenda entries are filter by time, only showing those task with DEADLINE, SCHEDULE-TIME or TIMESTAMP . To show all agenda entries (except DONE)
-
-  (setq dashboard-filter-agenda-entry 'dashboard-no-filter-agenda)
-
-#+end_src
-
-*** Shortcuts
-
-| Shortcut                   | Function         |
-| Tab Or C-i                 | Next Item        |
-| Shift-Tab                  | Previous Item    |
-| Return / Mouse Click / C-m | Open             |
-| r                          | Recent files     |
-| m                          | Bookmarks        |
-| p                          | Projects         |
-| a                          | Org-Mode Agenda  |
-| e                          | Registers        |
-| g                          | Refresh contents |
-| {                          | Previous section |
-| }                          | Next section     |
 
 ** Theme
 
@@ -599,15 +484,15 @@ You'll notice that many of the packages in this section have =:defer nil=. This 
     ;; defaults
     (setq doom-themes-enable-bold t
   	doom-themes-enable-italic t)
-    (load-theme 'doom-material-dark t)
 
     ;; flashing mode on error
     (doom-themes-visual-bell-config)
     ;; neotree theme
     (doom-themes-neotree-config)
     ;; org-mode
-    ;; (doom-themes-org-config)
-    )
+    (doom-themes-org-config))
+
+  (load-theme 'doom-material-dark)
 #+end_src
 
 ** Doom Modeline
@@ -902,7 +787,6 @@ Desktop mode also includes the =desktop-clear= function, which can be used to ki
 
 #+begin_src emacs-lisp
   (use-package desktop
-    :defer nil
     :custom
     (desktop-restore-eager   1 "Restore the first buffer right away")
     (desktop-lazy-idle-delay 1 "Restore the other buffers 1 second later")
@@ -919,7 +803,6 @@ The =uniquify= package makes it much easier to identify different open files wit
 
 #+begin_src emacs-lisp
   (use-package uniquify
-    :defer 1
     :ensure nil
     :custom
     (uniquify-after-kill-buffer-p t)
@@ -934,7 +817,6 @@ I like to highlight the current line. For this I use the built-in =hl-line=.
 #+begin_src emacs-lisp :noweb yes
   (use-package hl-line
     :disabled
-    :defer nil
     :config
     <<hl-line custom line-range function>>
     (global-hl-line-mode))
@@ -965,13 +847,12 @@ I have also experimented with highlighting the current column. At the moment the
 #+begin_src emacs-lisp
   (use-package col-highlight
     :disabled
-    :defer nil
     :config
     (col-highlight-toggle-when-idle)
     (col-highlight-set-interval 2))
+
   (use-package crosshairs
     :disabled
-    :defer nil
     :config
     (crosshairs-mode))
 #+end_src
@@ -982,7 +863,6 @@ I also use =recentf= to keep a list of recently open buffers. These are visible 
 
 #+begin_src emacs-lisp
   (use-package recentf
-    :defer 1
     :custom
     (recentf-max-menu-items 100)
     (recentf-max-saved-items 100)
@@ -1018,7 +898,6 @@ The [[https://github.com/nonsequitur/smex][smex]] package is incredibly useful, 
 
 #+begin_src emacs-lisp
   (use-package midnight
-    :defer 3
     :config
     (setq midnight-period 7200)
     (midnight-mode 1))
@@ -1064,7 +943,6 @@ For distraction-free writing, I'm testing out =writeroom-mode=.
 
 #+begin_src emacs-lisp
   (use-package wc-mode
-    :defer 3
     :hook
     (org-journal-mode . wc-mode))
 #+end_src
@@ -1074,8 +952,7 @@ For distraction-free writing, I'm testing out =writeroom-mode=.
 The =all-the-icons= package provides a number of useful icons.
 
 #+begin_src emacs-lisp
-  (use-package all-the-icons
-    :defer 3)
+  (use-package all-the-icons)
 #+end_src
 
 ** Completion: IDO or Helm?
@@ -1112,7 +989,6 @@ This config came originally from [[https://github.com/daedreth/UncleDavesEmacs#u
 #+begin_src emacs-lisp
   (use-package helm
     :ensure t
-    :defer 1
     :diminish helm-mode
     :bind
     (("C-x C-f"       . helm-find-files)
@@ -1229,30 +1105,20 @@ With =aggressive-indent=, indentation is always kept up to date in the whole buf
 =projectile-mode= allows us to perform project-relative operations such as searches, navigation, etc.
 
 #+begin_src emacs-lisp
-  (use-package projectile
-    :defer 2
-    :diminish projectile-mode
-    :config
-    (projectile-global-mode)
-    :bind-keymap
-    ("C-c p" . projectile-command-map)
-    :init
-    (when (file-directory-p "~/Music")
-    	(setq projectile-project-search-path `("~/Music")))
-    (setq projectile-switch-project-action #'projectile-dired))
+    (use-package projectile
+      :diminish projectile-mode
+      :config
+      (projectile-mode +1)
+      :bind-keymap
+      ("C-c p" . projectile-command-map)
+      :init
+      (when (file-directory-p "~/Music")
+        (setq projectile-project-search-path `("~/Music")))
+      (setq projectile-switch-project-action #'projectile-dired))
 
-
-  ;;; find the root of the project
-  (defun projectile-project-find-function (dir)
-    (let* ((root (projectile-project-root dir)))
-      (and root (cons 'transient root))))
-
-  (with-eval-after-load 'project
-    (add-to-list 'project-find-functions 'projectile-project-find-function))
-
-  (use-package counsel-projectile
-    :ensure t
-    :config (counsel-projectile-mode))
+    (use-package counsel-projectile
+      :ensure t
+      :config (counsel-projectile-mode))
 
 #+end_src
 
@@ -1287,7 +1153,6 @@ On-the-fly spell checking. I enable it for all text modes.
 
 #+begin_src emacs-lisp
   (use-package flyspell
-    :defer 1
     :diminish)
 #+end_src
 
@@ -1369,42 +1234,42 @@ Browse the wiki for more information about setting up, using realgud, exploring 
 #+begin_src emacs-lisp
 
   (use-package flycheck-eglot
-  :ensure t
-  :after (flycheck eglot)
-  :custom (flycheck-eglot-exclusive nil)
-  :config
-  (global-flycheck-eglot-mode 1))
+    :ensure t
+    :after (flycheck eglot)
+    :custom (flycheck-eglot-exclusive nil)
+    :config
+    (global-flycheck-eglot-mode 1))
 
   (use-package eglot
     :hook (((go-mode. eglot-ensure)
-  	         (cc-mode . eglot-ensure)
-             (python-mode . eglot-ensure)
-  	         (java-mode . eglot-ensure)
-  	         (lua-mode . eglot-ensure)
-  	         (zig-mode . eglot-ensure)
-  	         (json-mode . eglot-ensure)
-  	         (markdown-mode . eglot-ensure)
-  	         (sh-mode . eglot-ensure)
-  	         (powershell-mode . eglot-ensure)
-  	         (clojure-mode . eglot-ensure)
+  	  (cc-mode . eglot-ensure)
+            (python-mode . eglot-ensure)
+  	  (java-mode . eglot-ensure)
+  	  (lua-mode . eglot-ensure)
+  	  (zig-mode . eglot-ensure)
+  	  (json-mode . eglot-ensure)
+  	  (markdown-mode . eglot-ensure)
+  	  (sh-mode . eglot-ensure)
+  	  (powershell-mode . eglot-ensure)
+  	  (clojure-mode . eglot-ensure)
 
-  					 (python-mode . eglot-mode)
-  					 (c-mode . eglot-mode)
-  					 (go-mode . eglot-mode)))
+  	  (python-mode . eglot-mode)
+  	  (c-mode . eglot-mode)
+  	  (go-mode . eglot-mode)))
     :bind (:map eglot-mode-map
-  	        ("M-."   . xref-find-definitions)
-  	        ("M-?"   . xref-find-references)
-  	        ("C-c f" . eglot-format-buffer)
-  	        ("C-c r" . eglot-rename)
-  	        ("C-c a" . eglot-code-actions)
-  	        ("C-c h" . eglot-hover)
-  	        ("C-c C-x f" . eglot-find-references)
-  	        ("C-c s" . eglot-workspace-symbol)
-  	        ("C-c n" . flycheck-goto-next-error)
-  	        ("C-c p" . flycheck-goto-prev-error))
+  	      ("M-."   . xref-find-definitions)
+  	      ("M-?"   . xref-find-references)
+  	      ("C-c f" . eglot-format-buffer)
+  	      ("C-c r" . eglot-rename)
+  	      ("C-c a" . eglot-code-actions)
+  	      ("C-c h" . eglot-hover)
+  	      ("C-c C-x f" . eglot-find-references)
+  	      ("C-c s" . eglot-workspace-symbol)
+  	      ("C-c n" . flycheck-goto-next-error)
+  	      ("C-c p" . flycheck-goto-prev-error))
     :config
     (setq eldoc-documentation-strategy
-  	  #'eldoc-documentation-compose-eagerly) ; signature help
+  	#'eldoc-documentation-compose-eagerly) ; signature help
 
     (setq eldoc-echo-area-use-multiline-p nil) ; single line eldoc
     (setq eldoc-idle-delay 0.1)
@@ -1417,27 +1282,27 @@ Browse the wiki for more information about setting up, using realgud, exploring 
 
     ;;inlay hints at startup
     (add-hook 'eglot-managed-mode-hook
-  	  (lambda ()
-  	    (when (eglot-server-capable :inlayHintProvider)
-  		    (eglot-inlay-hints-mode 1))))
+  	    (lambda ()
+  	      (when (eglot-server-capable :inlayHintProvider)
+  		(eglot-inlay-hints-mode 1))))
 
     (setq completion-auto-help nil)
     (setq completion-show-inline-help nil))
 
   (with-eval-after-load 'eglot
     (setq eglot-server-programs
-      '((c-mode . ("clangd"))
-         (c++-mode . ("clangd"))
-         (go-mode . ("gopls"))
-         (python-mode . ("pyright-langserver" "--stdio"))
-         (java-mode . ("jdtls"))
-         (lua-mode . ("lua-language-server"))
-         (zig-mode . ("zls"))
-         (json-mode . ("vscode-json-languageserver" "--stdio"))
-         (markdown-mode . ("marksman"))
-         (sh-mode . ("bash-language-server" "start"))
-         (powershell-mode . ("powershell-editor-services" "--stdio"))
-         (clojure-mode . ("clojure-lsp")))))
+          '((c-mode . ("clangd"))
+            (c++-mode . ("clangd"))
+            (go-mode . ("gopls"))
+            (python-mode . ("pyright-langserver" "--stdio"))
+            (java-mode . ("jdtls"))
+            (lua-mode . ("lua-language-server"))
+            (zig-mode . ("zls"))
+            (json-mode . ("vscode-json-languageserver" "--stdio"))
+            (markdown-mode . ("marksman"))
+            (sh-mode . ("bash-language-server" "start"))
+            (powershell-mode . ("powershell-editor-services" "--stdio"))
+            (clojure-mode . ("clojure-lsp")))))
 
 #+end_src
 
@@ -1862,128 +1727,6 @@ Another useful addition for LISP coding - =smartparens= enforces parenthesis to 
                                           'zz/sp-enclose-next-sexp))))
 #+end_src
 
-Minor mode for highlighting the current sexp in LISP modes.
-
-#+begin_src emacs-lisp
-  (defgroup highlight-sexp nil
-  "Highlight sexp"
-  :group 'faces
-  :group 'matching)
-
-(defvar hl-sexp-overlay
-  nil
-  "The current overlay.")
-
-(defcustom hl-sexp-background-color
-  "#4b3b4b"
-  "*The color used for the background of the highlighted sexp."
-  :type 'color
-  :group 'highlight-sexp)
-
-(defcustom hl-sexp-foreground-color
-  nil
-  "*The color used for the foreground of the highlighted sexp"
-  :type 'color
-  :group 'highlight-sexp)
-
-(make-face 'hl-sexp-face)
-(defcustom hl-sexp-face
-  nil
-  "*The face used for the highlighted sexp."
-  :group 'highlight-sexp)
-
-;;;###autoload
-(define-minor-mode highlight-sexp-mode
-  "Minor mode to highlight the current zone according to its
-    context, i.e. sexp, comment, string."
-  nil
-  " hl-sexp"
-  nil
-  (if highlight-sexp-mode
-      (progn
-        (hl-sexp-create-overlay)
-        (add-hook 'post-command-hook 'hl-sexp-highlight nil t)
-        (add-hook 'clone-indirect-buffer-hook 'hl-sexp-handle-clone-indirect-buffer nil t))
-    (hl-sexp-delete-overlay)
-    (kill-local-variable 'hl-sexp-overlay)
-    (remove-hook 'post-command-hook 'hl-sexp-highlight t)
-    (remove-hook 'clone-indirect-buffer-hook 'hl-sexp-handle-clone-indirect-buffer t))
-  )
-
-;;;###autoload
-(define-globalized-minor-mode global-highlight-sexp-mode
-  highlight-sexp-mode
-  (lambda ()
-    (highlight-sexp-mode t)))
-
-(defun hl-sexp-delete-overlay ()
-  (if hl-sexp-overlay
-      (delete-overlay hl-sexp-overlay))
-  (setq hl-sexp-overlay nil))
-
-(defun hl-sexp-highlight ()
-  (let ((text-property (get-text-property (point) 'face)))
-    ;; HACKY HACK: just in case, this avoid to go further.
-    (cond ((or (eq text-property 'font-lock-string-face)
-               (eq text-property 'font-lock-comment-face)
-               (eq text-property 'font-lock-doc-face))
-           (move-overlay hl-sexp-overlay 0 0))
-          (t
-           (save-excursion
-             (ignore-errors
-               (let* ((sppss (syntax-ppss))
-                      (start (elt sppss 1))
-                      (inside-a-string? (elt sppss 3))
-                      (inside-a-comment? (elt sppss 4))
-                      end)
-                 ;; 'font-lock-****-face isn't really to be trusted
-                 (cond ((and start
-                             (not inside-a-string?)
-                             (not inside-a-comment?))
-                        (ignore-errors
-                          (setq end (scan-sexps start 1)))
-                        (cond (end
-                               (move-overlay hl-sexp-overlay (1+ start) (1- end)))
-                              (t
-                               (move-overlay hl-sexp-overlay (1+ start) (point)))))
-                       (t (move-overlay hl-sexp-overlay 0 0))))))))))
-
-(defun hl-sexp-create-overlay ()
-  (let ((attribute (face-attr-construct 'hl-sexp-face)))
-    (if hl-sexp-foreground-color
-        (setq attribute (plist-put attribute :foreground hl-sexp-foreground-color)))
-    (if hl-sexp-background-color
-        (setq attribute (plist-put attribute :background hl-sexp-background-color)))
-    (set (make-local-variable 'hl-sexp-overlay) (make-overlay 0 0))
-    (overlay-put hl-sexp-overlay 'face attribute)))
-
-(defun hl-sexp-handle-clone-indirect-buffer ()
-  "Set hl-sexp-overlay correctly when the buffer is cloned."
-  (set (make-local-variable 'hl-sexp-overlay) (copy-overlay hl-sexp-overlay))
-  (move-overlay hl-sexp-overlay
-                (overlay-start hl-sexp-overlay)
-                (overlay-end hl-sexp-overlay)
-                (current-buffer))
-  (dolist (something (overlay-lists))
-    ;; This is really dirty but `overlay-lists` doesn't return a list
-    ;; of list of overlay, but a mix of it.
-    (cond ((listp something)
-           (dolist (overlay something)
-             (if (and
-                  (not (eq overlay hl-sexp-overlay))
-                  (equal overlay hl-sexp-overlay))
-                 (delete-overlay overlay))))
-          ((overlayp something)
-           (if (and
-                (not (eq something hl-sexp-overlay))
-                (equal something hl-sexp-overlay))
-               (delete-overlay something))))))
-
-  (add-hook 'lisp-mode-hook 'highlight-sexp-mode)
-  (add-hook 'emacs-lisp-mode-hook 'highlight-sexp-mode)
-
-#+end_src
-
 Trying out [[https://github.com/abo-abo/lispy][lispy]] for LISP code editing (disabled for now).
 
 #+begin_src emacs-lisp
@@ -2003,6 +1746,7 @@ Trying out [[https://github.com/abo-abo/lispy][lispy]] for LISP code editing (di
 Some tools for developing Emacs LISP modules and for contributing to MELPA:
 
 - [[https://melpa.org/#/flycheck][Flycheck]]
+
   #+begin_src emacs-lisp
 
   (use-package flycheck
@@ -2013,9 +1757,9 @@ Some tools for developing Emacs LISP modules and for contributing to MELPA:
   #+end_src
 
 - [[https://github.com/purcell/package-lint][package-lint]]
+
   #+begin_src emacs-lisp
-    (use-package package-lint
-      :defer 3)
+    (use-package package-lint)
   #+end_src
 
 ** [[https://www.perl.org/][Perl]].
@@ -2159,8 +1903,7 @@ The =rx= library makes it easier to express regular expressions (I know regex sy
   #+begin_src emacs-lisp
     (require 'rx)
     (use-package xr
-      :ensure t
-      :defer nil)
+      :ensure t)
   #+end_src
 ** heml-pass
 
@@ -2374,7 +2117,7 @@ When [[https://www.emacswiki.org/emacs/TypographicalPunctuationMarks][typopunct]
 
   #+begin_src emacs-lisp
     (use-package undo-tree
-      :ensure nil
+      :ensure t
       :diminish undo-tree-mode
       :config
       (global-undo-tree-mode 1))
@@ -2513,7 +2256,6 @@ Now I define keybindings to access my commonly-used org files, and add them to =
   (use-package org-capture
     :ensure nil
     :after org
-    :defer 1
     :bind
     ("C-c c" . org-capture)
     :config
@@ -2554,7 +2296,6 @@ I also provide some customization for the =holidays= package, since its entries 
 
 #+begin_src emacs-lisp
   (use-package holidays
-    :defer nil
     :ensure nil
     :init
     :config
@@ -2567,7 +2308,6 @@ I also provide some customization for the =holidays= package, since its entries 
   ;; (require 'org-habit)
   ;; (use-package org-super-agenda
   ;;   :ensure t
-  ;;   :defer nil
   ;;   :custom
   ;;   (org-super-agenda-groups '((:auto-dir-name t)))
   ;;   :config
@@ -2587,10 +2327,10 @@ Trying out [[https://github.com/Trevoke/org-gtd.el][org-gtd]]:
 
 #+begin_src emacs-lisp
   (use-package org-edna
-    :ensure t
-    :defer nil)
+    :ensure t)
+
+
   (use-package org-gtd
-    :defer 3
     :after org
     :config
     (require 'org-gtd)
@@ -2612,6 +2352,10 @@ Trying out [[https://github.com/Trevoke/org-gtd.el][org-gtd]]:
     (setq org-agenda-property-list '("DELEGATED_TO"))
     ;; I think this makes the agenda easier to read
     (setq org-agenda-property-position 'next-line))
+
+  ;; not upgrading since I don't know what it is.
+  (setq org-gtd-update-ack "2.1.0")
+
 #+end_src
 
 #+begin_src emacs-lisp :tangle no :noweb-ref org-capture-config
@@ -2635,13 +2379,11 @@ Install and load dependencies first.
 
 #+begin_src emacs-lisp
   (use-package emacsql
-    :ensure t
-    :defer nil)
+    :ensure t)
 
   ;; (use-package emacsql-sqlite
   ;;   :ensure t
-  ;;   :after emacsql
-  ;;   :defer nil)
+  ;;   :after emacsql)
 #+end_src
 
 Then we load =org-roam= itself.
@@ -2690,7 +2432,6 @@ Using =org-download= to make it easier to insert images into my org notes.
   (use-package org-download
     :ensure t
     :after org
-    :defer nil
     :custom
     (org-download-method 'directory)
     (org-download-image-dir "images")
@@ -2718,13 +2459,11 @@ Using =org-download= to make it easier to insert images into my org notes.
 #+begin_src emacs-lisp
   (use-package ox-reveal
     :load-path ("lisp/org-reveal")
-    :defer 3
     :after org
     :custom
     (org-reveal-note-key-char nil)
     (org-reveal-root "file:///Users/taazadi1/.emacs.d/lisp/reveal.js"))
   (use-package htmlize
-    :defer 3
     :after ox-reveal)
 #+end_src
 
@@ -2737,7 +2476,6 @@ One of the big strengths of org-mode is the ability to export a document in many
   #+begin_src emacs-lisp
     (use-package ox-html
       :ensure nil
-      :defer 3
       :after org
       :custom
       (org-html-checkbox-type 'unicode))
@@ -2748,7 +2486,6 @@ One of the big strengths of org-mode is the ability to export a document in many
   #+begin_src emacs-lisp
     (use-package ox-md
       :ensure nil
-      :defer 3
       :after org)
   #+end_src
 
@@ -2756,14 +2493,12 @@ One of the big strengths of org-mode is the ability to export a document in many
 
   #+begin_src emacs-lisp
     (use-package ox-jira
-      :defer 3
       :after org)
   #+end_src
 
   # This is the real code, which gets tangled out to my config file
   #+begin_src emacs-lisp :exports none
     (use-package org-jira
-      :defer 3
       :after org
       :custom
       (jiralib-url "https://jira.swisscom.com"))
@@ -2772,7 +2507,6 @@ One of the big strengths of org-mode is the ability to export a document in many
   # This is the version exported to blog posts and books, without the company name.
   #+begin_src emacs-lisp :tangle no
     (use-package org-jira
-      :defer 3
       :after org
       :custom
       (jiralib-url "https://jira.work.com"))
@@ -2782,7 +2516,6 @@ One of the big strengths of org-mode is the ability to export a document in many
 
   #+begin_src emacs-lisp
     (use-package ox-confluence
-      :defer 3
       :ensure nil
       :after org)
   #+end_src
@@ -2791,7 +2524,6 @@ One of the big strengths of org-mode is the ability to export a document in many
 
   #+begin_src emacs-lisp
     (use-package ox-asciidoc
-      :defer 3
       :after org)
   #+end_src
 
@@ -2800,7 +2532,6 @@ One of the big strengths of org-mode is the ability to export a document in many
   #+begin_src emacs-lisp
     (use-package ox-texinfo
       :load-path "lisp/org-mode/lisp"
-      :defer 3
       :ensure nil
       :after org)
   #+end_src
@@ -2864,7 +2595,6 @@ One of the big strengths of org-mode is the ability to export a document in many
   #+begin_src emacs-lisp
     (use-package ox-org
       :ensure nil
-      :defer 3
       :after org)
   #+end_src
 
@@ -2878,7 +2608,6 @@ One of the big strengths of org-mode is the ability to export a document in many
 
 #+begin_src emacs-lisp
   (use-package ox-hugo
-    :defer 3
     :after org
     ;; Testing hooks to automatically set the filename on an ox-hugo
     ;; blog entry when it gets marked as DONE
@@ -2927,7 +2656,7 @@ First, load the built-in EasyPG support. By calling =(epa-file-enable)=, Emacs a
   (use-package epa-file
     :ensure nil ;; included with Emacs
     :config
-    (setq epa-file-encrypt-to '("diego@zzamboni.org"))
+    (setq epa-file-encrypt-to '("zubairstudytech@gmail.com"))
     :custom
     (epa-file-select-keys 'silent))
 #+end_src
@@ -2942,7 +2671,7 @@ Then, load [[https://orgmode.org/worg/org-tutorials/encrypting-files.html][org-c
     (org-crypt-use-before-save-magic)
     (setq org-tags-exclude-from-inheritance (quote ("crypt")))
     :custom
-    (org-crypt-key "diego@zzamboni.org"))
+    (org-crypt-key "zubairstudytech@gmail.com"))
 #+end_src
 
 ** Keeping a Journal
@@ -3059,7 +2788,7 @@ Finally, we use this value to configure both =plantuml-mode= (for syntax highlig
 - You can define shortcuts for writing src code in org
 
   #+begin_src emacs-lisp
-    (required 'org-tempo)
+    (require 'org-tempo)
 
     (add-to-list 'org-structure-template-alist '("sh" . "src shell"))
     (add-to-list 'org-structure-template-alist '("el" . "src emacs-lisp"))
@@ -3220,30 +2949,16 @@ We choose a nice font for the document title and the section headings. The first
 
 #+begin_src emacs-lisp :tangle no :noweb-ref org-mode-config
 
-  ;; (let* ((variable-tuple
-  ;;         (cond ((x-list-fonts   "ETBembo")         '(:font   "ETBembo"))
-  ;;               ((x-list-fonts   "Source Sans Pro") '(:font   "Source Sans Pro"))
-  ;;               ((x-list-fonts   "Lucida Grande")   '(:font   "Lucida Grande"))
-  ;;               ((x-list-fonts   "Verdana")         '(:font   "Verdana"))
-  ;;               ((x-family-fonts "Sans Serif")      '(:family "Sans Serif"))
-  ;;               (nil (warn "Cannot find a Sans Serif Font."))))
-  ;;        (base-font-color (face-foreground 'default nil 'default))
-  ;;        (headline `(:inherit default :weight bold
-  ;;                    :foreground ,base-font-color)))
-
-  ;;   (custom-theme-set-faces
-  ;;    'user
-  ;;    `(org-level-8        ((t (,@headline ,@variable-tuple))))
-  ;; 		`(org-level-7        ((t (,@headline ,@variable-tuple))))
-  ;;    `(org-level-6        ((t (,@headline ,@variable-tuple))))
-  ;;    `(org-level-5        ((t (,@headline ,@variable-tuple))))
-  ;;    `(org-level-4        ((t (,@headline ,@variable-tuple :height 1.1))))
-  ;;    `(org-level-3        ((t (,@headline ,@variable-tuple :height 1.25))))
-  ;;    `(org-level-2        ((t (,@headline ,@variable-tuple :height 1.5))))
-  ;;    `(org-level-1        ((t (,@headline ,@variable-tuple :height 1.75))))
-  ;;    `(org-headline-done  ((t (,@headline ,@variable-tuple :strike-through t))))
-  ;;    `(org-document-title ((t (,@headline ,@variable-tuple
-  ;;                                         :height 2.0 :underline nil))))))
+    (let* ((variable-tuple
+             (cond ((x-list-fonts   "ETBembo")         '(:font   "ETBembo"))
+                   ((x-list-fonts   "Source Sans Pro") '(:font   "Source Sans Pro"))
+                   ((x-list-fonts   "Lucida Grande")   '(:font   "Lucida Grande"))
+                   ((x-list-fonts   "Verdana")         '(:font   "Verdana"))
+                   ((x-family-fonts "Sans Serif")      '(:family "Sans Serif"))
+                   (nil (warn "Cannot find a Sans Serif Font."))))
+            (base-font-color (face-foreground 'default nil 'default))
+            (headline `(:inherit default :weight bold
+                        :foreground ,base-font-color))))
 #+end_src
 
 *** Fonts and wrapping
@@ -3654,7 +3369,6 @@ The =ox-leanpub= module sets up Markua export automatically, and I add the code 
 
 #+begin_src emacs-lisp
   (use-package ox-leanpub
-    :defer 1
     :after org
     :config
     (require 'ox-leanpub-markdown)
@@ -3852,14 +3566,9 @@ A work-in-progress Hammerspoon shell for Emacs, posted on the Hammerspoon mailin
             (with-current-buffer buffer
               (comint-write-input-ring)))
           (buffer-list)))
-  (add-hook 'kill-emacs-hook 'comint-write-input-ring-all-buffers)
+  (add-hook 'kill-emacs-hook 'comint-write-input-ring-all-buffers))
 #+end_src
 
 * Epilogue
 
 Here we close the =let= expression from [[*Performance optimization][the preface]].
-
-#+begin_src emacs-lisp
-(setq gc-cons-threshold (* 2 1000 1000))
-)
-#+end_src
