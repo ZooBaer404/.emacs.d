@@ -1464,6 +1464,12 @@ Browse the wiki for more information about setting up, using realgud, exploring 
 
 #+end_src
 
+#+begin_src emacs-lisp
+      (use-package ein
+        :ensure t
+        :mode "\\.ipynb\\'")
+#+end_src
+
 ** Java
 
 #+begin_src emacs-lisp
